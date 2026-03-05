@@ -4,61 +4,97 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EventTracker.Controllers;
 
-
+/// <summary>
+/// Контроллер для управления событиями (мероприятиями)
+/// </summary>
 [ApiController]
 [Route("events")]
-
-public class EventController(IEventService eventService) : ControllerBase
+public class EventsController(IEventService eventService) : ControllerBase
 {
     private readonly IEventService _eventService = eventService;
 
+    /// <summary>
+    /// Получить список всех событий
+    /// </summary>
+    /// <returns>Список событий</returns>
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<EventResponseDto>), StatusCodes.Status200OK)]
     public IActionResult GetAllEvents()
     {
         var events = _eventService.GetAllEvents();
         return Ok(events);
     }
 
+    /// <summary>
+    /// Получить событие по идентификатору
+    /// </summary>
+    /// <param name="id">Идентификатор события (GUID)</param>
+    /// <returns>Событие с указанным идентификатором</returns>
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetEventById(Guid id)
     {
-        var singleEvent = _eventService.GetEventById(id);
-        if (singleEvent is null)
+        var ev = _eventService.GetEventById(id);
+        if (ev is null)
         {
             return NotFound();
         }
-        return Ok(singleEvent);
+        return Ok(ev);
     }
 
+    /// <summary>
+    /// Создать новое событие
+    /// </summary>
+    /// <param name="dto">Данные для создания события</param>
+    /// <returns>Созданное событие с идентификатором</returns>
     [HttpPost]
-
+    [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult CreateEvent([FromBody] CreateEventDto dto)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
-        var createEvent = _eventService.CreateEvent(dto);
-        return CreatedAtAction(nameof(GetEventById), new { id = createEvent.Id }, createEvent);
+
+        var createdEvent = _eventService.CreateEvent(dto);
+        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, createdEvent);
     }
 
-    [HttpPut("id")]
-    public IActionResult UpdateEvevnt(Guid id, [FromBody] UpdateEventDto dto)
+    /// <summary>
+    /// Обновить существующее событие
+    /// </summary>
+    /// <param name="id">Идентификатор события для обновления</param>
+    /// <param name="dto">Новые данные события</param>
+    /// <returns>Обновленное событие</returns>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult UpdateEvent(Guid id, [FromBody] UpdateEventDto dto)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
-        var updateEvent = _eventService.UpdateEvent(id, dto);
-        if (updateEvent is null)
+
+        var updatedEvent = _eventService.UpdateEvent(id, dto);
+        if (updatedEvent is null)
         {
             return NotFound();
         }
-        return Ok(updateEvent);
+        return Ok(updatedEvent);
     }
 
+    /// <summary>
+    /// Удалить событие по идентификатору
+    /// </summary>
+    /// <param name="id">Идентификатор события для удаления</param>
+    /// <returns>Результат удаления</returns>
     [HttpDelete("{id:guid}")]
-
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult DeleteEvent(Guid id)
     {
         var deleted = _eventService.DeleteEvent(id);
