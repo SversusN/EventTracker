@@ -1,6 +1,9 @@
-﻿namespace EventTracker.Models.Dto
-{
-    public class EventResponseDto
-    {
-    }
-}
+﻿namespace EventTracker.Models.Dto;
+
+public record EventResponseDto(
+    Guid Id,
+    string Title,
+    string? Description,
+    DateTime StartAt,
+    DateTime EndAt
+);

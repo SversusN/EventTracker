@@ -7,7 +7,7 @@ namespace EventTracker.Services;
 public class EventService : IEventService
 {
     private readonly List<Event> _events = [];
-    //List не потокобезопасен, можно 
+    //List не потокобезопасен, можно ConcurrentBag
     private readonly Lock _lock = new();
 
     public IEnumerable<EventResponseDto> GetAllEvents()
