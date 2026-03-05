@@ -6,11 +6,17 @@ namespace EventTracker.Services;
 public class EventService : IEventService
 {
     private readonly List<Event> _events = [];
-    //List не потокобезопасен, можно ConcurrentBag
     private readonly Lock _lock = new();
+    private readonly ILogger<EventService> _logger;
+
+    public EventService(ILogger<EventService> logger)
+    {
+        _logger = logger;
+    }
 
     public IEnumerable<EventResponseDto> GetAllEvents()
     {
+        _logger.LogInformation("Getting all events. Count: {Count}", _events.Count);
         lock (_lock)
         {
             return _events.Select(MapToResponseDto).ToList();
@@ -19,10 +25,16 @@ public class EventService : IEventService
 
     public EventResponseDto? GetEventById(Guid id)
     {
+        _logger.LogInformation("Getting event by id: {Id}", id);
         lock (_lock)
         {
             var ev = _events.FirstOrDefault(e => e.Id == id);
-            return ev is null ? null : MapToResponseDto(ev);
+            if (ev is null)
+            {
+                _logger.LogWarning("Event with id {Id} not found", id);
+                return null;
+            }
+            return MapToResponseDto(ev);
         }
     }
 
@@ -40,16 +52,19 @@ public class EventService : IEventService
             _events.Add(ev);
         }
 
+        _logger.LogInformation("Created event with id: {Id}, title: {Title}", ev.Id, ev.Title);
         return MapToResponseDto(ev);
     }
 
     public EventResponseDto? UpdateEvent(Guid id, UpdateEventDto dto)
     {
+        _logger.LogInformation("Updating event with id: {Id}", id);
         lock (_lock)
         {
             var ev = _events.FirstOrDefault(e => e.Id == id);
             if (ev is null)
             {
+                _logger.LogWarning("Event with id {Id} not found for update", id);
                 return null;
             }
 
@@ -60,21 +75,25 @@ public class EventService : IEventService
                 dto.EndAt
             );
 
+            _logger.LogInformation("Updated event with id: {Id}", id);
             return MapToResponseDto(ev);
         }
     }
 
     public bool DeleteEvent(Guid id)
     {
+        _logger.LogInformation("Deleting event with id: {Id}", id);
         lock (_lock)
         {
             var ev = _events.FirstOrDefault(e => e.Id == id);
             if (ev is null)
             {
+                _logger.LogWarning("Event with id {Id} not found for deletion", id);
                 return false;
             }
 
             _events.Remove(ev);
+            _logger.LogInformation("Deleted event with id: {Id}", id);
             return true;
         }
     }
