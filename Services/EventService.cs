@@ -1,6 +1,5 @@
 ﻿using EventTracker.Models;
 using EventTracker.Models.Dto;
-using EventTracker.Models.Dtos;
 
 namespace EventTracker.Services;
 

@@ -1,5 +1,4 @@
 ﻿using EventTracker.Models.Dto;
-using EventTracker.Models.Dtos;
 using EventTracker.Services;
 using Microsoft.AspNetCore.Mvc;
 
