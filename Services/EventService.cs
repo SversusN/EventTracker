@@ -1,12 +1,12 @@
-﻿using EventTracker.Models;
+﻿using System.Collections.Concurrent;
+using EventTracker.Models;
 using EventTracker.Models.Dto;
 
 namespace EventTracker.Services;
 
 public class EventService : IEventService
 {
-    private readonly List<Event> _events = [];
-    private readonly Lock _lock = new();
+    private readonly ConcurrentDictionary<Guid, Event> _events = new();
     private readonly ILogger<EventService> _logger;
 
     public EventService(ILogger<EventService> logger)
@@ -14,31 +14,24 @@ public class EventService : IEventService
         _logger = logger;
     }
 
-    public IEnumerable<EventResponseDto> GetAllEvents()
+    public IEnumerable<Event> GetAllEvents()
     {
         _logger.LogInformation("Getting all events. Count: {Count}", _events.Count);
-        lock (_lock)
-        {
-            return _events.Select(MapToResponseDto).ToList();
-        }
+        return _events.Values.ToList();
     }
 
-    public EventResponseDto? GetEventById(Guid id)
+    public Event? GetEventById(Guid id)
     {
         _logger.LogInformation("Getting event by id: {Id}", id);
-        lock (_lock)
+        if (!_events.TryGetValue(id, out var ev))
         {
-            var ev = _events.FirstOrDefault(e => e.Id == id);
-            if (ev is null)
-            {
-                _logger.LogWarning("Event with id {Id} not found", id);
-                return null;
-            }
-            return MapToResponseDto(ev);
+            _logger.LogWarning("Event with id {Id} not found", id);
+            return null;
         }
+        return ev;
     }
 
-    public EventResponseDto CreateEvent(CreateEventDto dto)
+    public Event CreateEvent(CreateEventDto dto)
     {
         var ev = new Event(
             dto.Title,
@@ -47,65 +40,42 @@ public class EventService : IEventService
             dto.EndAt
         );
 
-        lock (_lock)
-        {
-            _events.Add(ev);
-        }
+        _events.TryAdd(ev.Id, ev);
 
         _logger.LogInformation("Created event with id: {Id}, title: {Title}", ev.Id, ev.Title);
-        return MapToResponseDto(ev);
+        return ev;
     }
 
-    public EventResponseDto? UpdateEvent(Guid id, UpdateEventDto dto)
+    public Event? UpdateEvent(Guid id, UpdateEventDto dto)
     {
         _logger.LogInformation("Updating event with id: {Id}", id);
-        lock (_lock)
+        if (!_events.TryGetValue(id, out var ev))
         {
-            var ev = _events.FirstOrDefault(e => e.Id == id);
-            if (ev is null)
-            {
-                _logger.LogWarning("Event with id {Id} not found for update", id);
-                return null;
-            }
-
-            ev.Update(
-                dto.Title,
-                dto.Description,
-                dto.StartAt,
-                dto.EndAt
-            );
-
-            _logger.LogInformation("Updated event with id: {Id}", id);
-            return MapToResponseDto(ev);
+            _logger.LogWarning("Event with id {Id} not found for update", id);
+            return null;
         }
+
+        ev.Update(
+            dto.Title,
+            dto.Description,
+            dto.StartAt,
+            dto.EndAt
+        );
+
+        _logger.LogInformation("Updated event with id: {Id}", id);
+        return ev;
     }
 
     public bool DeleteEvent(Guid id)
     {
         _logger.LogInformation("Deleting event with id: {Id}", id);
-        lock (_lock)
+        if (!_events.TryRemove(id, out _))
         {
-            var ev = _events.FirstOrDefault(e => e.Id == id);
-            if (ev is null)
-            {
-                _logger.LogWarning("Event with id {Id} not found for deletion", id);
-                return false;
-            }
-
-            _events.Remove(ev);
-            _logger.LogInformation("Deleted event with id: {Id}", id);
-            return true;
+            _logger.LogWarning("Event with id {Id} not found for deletion", id);
+            return false;
         }
-    }
 
-    private static EventResponseDto MapToResponseDto(Event ev)
-    {
-        return new EventResponseDto(
-            ev.Id,
-            ev.Title,
-            ev.Description,
-            ev.StartAt,
-            ev.EndAt
-        );
+        _logger.LogInformation("Deleted event with id: {Id}", id);
+        return true;
     }
 }

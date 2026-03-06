@@ -11,7 +11,6 @@ namespace EventTracker.Controllers;
 [Route("events")]
 public class EventsController(IEventService eventService) : ControllerBase
 {
-    private readonly IEventService _eventService = eventService;
 
     /// <summary>
     /// Получить список всех событий
@@ -21,7 +20,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<EventResponseDto>), StatusCodes.Status200OK)]
     public IActionResult GetAllEvents()
     {
-        var events = _eventService.GetAllEvents();
+        var events = eventService.GetAllEvents();
         return Ok(events);
     }
 
@@ -35,7 +34,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetEventById(Guid id)
     {
-        var ev = _eventService.GetEventById(id);
+        var ev = eventService.GetEventById(id);
         if (ev is null)
         {
             return NotFound();
@@ -58,7 +57,7 @@ public class EventsController(IEventService eventService) : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var createdEvent = _eventService.CreateEvent(dto);
+        var createdEvent = eventService.CreateEvent(dto);
         return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, createdEvent);
     }
 
@@ -79,7 +78,7 @@ public class EventsController(IEventService eventService) : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var updatedEvent = _eventService.UpdateEvent(id, dto);
+        var updatedEvent = eventService.UpdateEvent(id, dto);
         if (updatedEvent is null)
         {
             return NotFound();
@@ -97,7 +96,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult DeleteEvent(Guid id)
     {
-        var deleted = _eventService.DeleteEvent(id);
+        var deleted = eventService.DeleteEvent(id);
         if (!deleted)
         {
             return NotFound();

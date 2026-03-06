@@ -5,9 +5,9 @@ namespace EventTracker.Services;
 
 public interface IEventService
 {
-    IEnumerable<EventResponseDto> GetAllEvents();
-    EventResponseDto? GetEventById(Guid id);
-    EventResponseDto CreateEvent(CreateEventDto dto);
-    EventResponseDto? UpdateEvent(Guid id, UpdateEventDto dto);
+    IEnumerable<Event> GetAllEvents();
+    Event? GetEventById(Guid id);
+    Event CreateEvent(CreateEventDto dto);
+    Event? UpdateEvent(Guid id, UpdateEventDto dto);
     bool DeleteEvent(Guid id);
 }
