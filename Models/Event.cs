@@ -22,7 +22,7 @@ public class Event
         StartAt = startAt;
         EndAt = endAt;
     }
-
+    //Нужен для FromUpdateDto
     public Event(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
         Id = id;
