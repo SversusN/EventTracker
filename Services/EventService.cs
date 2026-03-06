@@ -1,8 +1,8 @@
 ﻿using System.Collections.Concurrent;
-using EventTracker.Models;
-using EventTracker.Models.Dto;
+using EventTrackerApi.Models;
+using EventTrackerApi.Models.Dto;
 
-namespace EventTracker.Services;
+namespace EventTrackerApi.Services;
 
 public class EventService : IEventService
 {
@@ -17,7 +17,7 @@ public class EventService : IEventService
     public IEnumerable<Event> GetAllEvents()
     {
         _logger.LogInformation("Getting all events. Count: {Count}", _events.Count);
-        return _events.Values.ToList();
+        return _events.Values;
     }
 
     public Event? GetEventById(Guid id)

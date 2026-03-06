@@ -1,7 +1,7 @@
-﻿using EventTracker.Models;
-using EventTracker.Models.Dto;
+﻿using EventTrackerApi.Models;
+using EventTrackerApi.Models.Dto;
 
-namespace EventTracker.Infrastructure.Mappers;
+namespace EventTrackerApi.Infrastructure.Mappers;
 
 /// <summary>
 /// Маппер для преобразования между Event и DTO

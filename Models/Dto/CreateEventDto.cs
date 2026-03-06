@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace EventTracker.Models.Dto;
+namespace EventTrackerApi.Models.Dto;
 
 public record CreateEventDto(
     [Required(ErrorMessage = "Title is required.")]

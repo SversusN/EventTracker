@@ -1,4 +1,4 @@
-﻿namespace EventTracker.Models.Dto;
+﻿namespace EventTrackerApi.Models.Dto;
 
 public record EventResponseDto(
     Guid Id,

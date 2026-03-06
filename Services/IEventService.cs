@@ -1,7 +1,7 @@
-﻿using EventTracker.Models;
-using EventTracker.Models.Dto;
+﻿using EventTrackerApi.Models;
+using EventTrackerApi.Models.Dto;
 
-namespace EventTracker.Services;
+namespace EventTrackerApi.Services;
 
 public interface IEventService
 {

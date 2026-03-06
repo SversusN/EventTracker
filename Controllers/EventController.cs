@@ -1,8 +1,8 @@
-﻿using EventTracker.Models.Dto;
-using EventTracker.Services;
+﻿using EventTrackerApi.Models.Dto;
+using EventTrackerApi.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EventTracker.Controllers;
+namespace EventTrackerApi.Controllers;
 
 /// <summary>
 /// Контроллер для управления событиями (мероприятиями)

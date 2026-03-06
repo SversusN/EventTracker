@@ -1,4 +1,4 @@
-﻿namespace EventTracker.Models;
+﻿namespace EventTrackerApi.Models;
 
 public class Event
 {
