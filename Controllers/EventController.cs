@@ -1,4 +1,5 @@
-﻿using EventTrackerApi.Models.Dto;
+﻿using EventTrackerApi.Infrastructure.Mappers;
+using EventTrackerApi.Models.Dto;
 using EventTrackerApi.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,6 @@ namespace EventTrackerApi.Controllers;
 [Route("events")]
 public class EventsController(IEventService eventService) : ControllerBase
 {
-
     /// <summary>
     /// Получить список всех событий
     /// </summary>
@@ -21,7 +21,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     public IActionResult GetAllEvents()
     {
         var events = eventService.GetAllEvents();
-        return Ok(events);
+        return Ok(EventMapper.ToResponseDtoList(events));
     }
 
     /// <summary>
@@ -39,7 +39,7 @@ public class EventsController(IEventService eventService) : ControllerBase
         {
             return NotFound();
         }
-        return Ok(ev);
+        return Ok(EventMapper.ToResponseDto(ev));
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ public class EventsController(IEventService eventService) : ControllerBase
         }
 
         var createdEvent = eventService.CreateEvent(dto);
-        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, createdEvent);
+        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, EventMapper.ToResponseDto(createdEvent));
     }
 
     /// <summary>
@@ -83,7 +83,7 @@ public class EventsController(IEventService eventService) : ControllerBase
         {
             return NotFound();
         }
-        return Ok(updatedEvent);
+        return Ok(EventMapper.ToResponseDto(updatedEvent));
     }
 
     /// <summary>

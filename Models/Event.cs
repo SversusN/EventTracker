@@ -22,13 +22,16 @@ public class Event
         StartAt = startAt;
         EndAt = endAt;
     }
-    public void Update(string title, string? description, DateTime startAt, DateTime endAt)
+
+    public Event(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
+        Id = id;
         Title = title;
         Description = description;
         StartAt = startAt;
         EndAt = endAt;
     }
+
 }
 
 

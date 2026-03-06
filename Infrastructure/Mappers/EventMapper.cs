@@ -29,4 +29,31 @@ public static class EventMapper
     {
         return events.Select(ToResponseDto);
     }
+
+    /// <summary>
+    /// Создаёт новый Event из CreateEventDto
+    /// </summary>
+    public static Event FromCreateDto(CreateEventDto dto)
+    {
+        return new Event(
+            dto.Title,
+            dto.Description,
+            dto.StartAt,
+            dto.EndAt
+        );
+    }
+
+    /// <summary>
+    /// Создаёт Event из UpdateEventDto с указанным Id
+    /// </summary>
+    public static Event FromUpdateDto(Guid id, UpdateEventDto dto)
+    {
+        return new Event(
+            id,
+            dto.Title,
+            dto.Description,
+            dto.StartAt,
+            dto.EndAt
+        );
+    }
 }

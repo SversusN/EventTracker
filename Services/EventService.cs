@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using EventTrackerApi.Infrastructure.Mappers;
 using EventTrackerApi.Models;
 using EventTrackerApi.Models.Dto;
 
@@ -33,12 +34,7 @@ public class EventService : IEventService
 
     public Event CreateEvent(CreateEventDto dto)
     {
-        var ev = new Event(
-            dto.Title,
-            dto.Description,
-            dto.StartAt,
-            dto.EndAt
-        );
+        var ev = EventMapper.FromCreateDto(dto);
 
         _events.TryAdd(ev.Id, ev);
 
@@ -49,21 +45,22 @@ public class EventService : IEventService
     public Event? UpdateEvent(Guid id, UpdateEventDto dto)
     {
         _logger.LogInformation("Updating event with id: {Id}", id);
-        if (!_events.TryGetValue(id, out var ev))
+        if (!_events.TryGetValue(id, out var existingEvent))
         {
             _logger.LogWarning("Event with id {Id} not found for update", id);
             return null;
         }
 
-        ev.Update(
-            dto.Title,
-            dto.Description,
-            dto.StartAt,
-            dto.EndAt
-        );
+        var updatedEvent = EventMapper.FromUpdateDto(id, dto);
+
+        if (!_events.TryUpdate(id, updatedEvent, existingEvent))
+        {
+            _logger.LogWarning("Event with id {Id} was modified by another request", id);
+            return null;
+        }
 
         _logger.LogInformation("Updated event with id: {Id}", id);
-        return ev;
+        return updatedEvent;
     }
 
     public bool DeleteEvent(Guid id)
