@@ -1,5 +1,4 @@
 ﻿using EventTrackerApi.Models;
-using EventTrackerApi.Models.Dto;
 
 namespace EventTrackerApi.Services;
 
@@ -7,7 +6,7 @@ public interface IEventService
 {
     IEnumerable<Event> GetAllEvents();
     Event? GetEventById(Guid id);
-    Event CreateEvent(CreateEventDto dto);
-    Event? UpdateEvent(Guid id, UpdateEventDto dto);
+    Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt);
+    Event? UpdateEvent(Guid id, string title, string? description, DateTime startAt, DateTime endAt);
     bool DeleteEvent(Guid id);
 }

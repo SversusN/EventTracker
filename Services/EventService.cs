@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using EventTrackerApi.Infrastructure.Mappers;
 using EventTrackerApi.Models;
-using EventTrackerApi.Models.Dto;
 
 namespace EventTrackerApi.Services;
 
@@ -32,9 +31,9 @@ public class EventService : IEventService
         return ev;
     }
 
-    public Event CreateEvent(CreateEventDto dto)
+    public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt)
     {
-        var ev = EventMapper.FromCreateDto(dto);
+        var ev = EventMapper.FromCreateDto(title, description, startAt, endAt);
 
         _events.TryAdd(ev.Id, ev);
 
@@ -42,7 +41,7 @@ public class EventService : IEventService
         return ev;
     }
 
-    public Event? UpdateEvent(Guid id, UpdateEventDto dto)
+    public Event? UpdateEvent(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
         _logger.LogInformation("Updating event with id: {Id}", id);
         if (!_events.TryGetValue(id, out var existingEvent))
@@ -51,7 +50,7 @@ public class EventService : IEventService
             return null;
         }
 
-        var updatedEvent = EventMapper.FromUpdateDto(id, dto);
+        var updatedEvent = EventMapper.FromUpdateDto(id, title, description, startAt, endAt);
 
         if (!_events.TryUpdate(id, updatedEvent, existingEvent))
         {

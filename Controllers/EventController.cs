@@ -57,7 +57,7 @@ public class EventsController(IEventService eventService) : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var createdEvent = eventService.CreateEvent(dto);
+        var createdEvent = eventService.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt);
         return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, EventMapper.ToResponseDto(createdEvent));
     }
 
@@ -78,7 +78,7 @@ public class EventsController(IEventService eventService) : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var updatedEvent = eventService.UpdateEvent(id, dto);
+        var updatedEvent = eventService.UpdateEvent(id, dto.Title, dto.Description, dto.StartAt, dto.EndAt);
         if (updatedEvent is null)
         {
             return NotFound();

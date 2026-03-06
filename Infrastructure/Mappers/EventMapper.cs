@@ -31,29 +31,29 @@ public static class EventMapper
     }
 
     /// <summary>
-    /// Создаёт новый Event из CreateEventDto
+    /// Создаёт новый Event из параметров
     /// </summary>
-    public static Event FromCreateDto(CreateEventDto dto)
+    public static Event FromCreateDto(string title, string? description, DateTime startAt, DateTime endAt)
     {
         return new Event(
-            dto.Title,
-            dto.Description,
-            dto.StartAt,
-            dto.EndAt
+            title,
+            description,
+            startAt,
+            endAt
         );
     }
 
     /// <summary>
-    /// Создаёт Event из UpdateEventDto с указанным Id
+    /// Создаёт Event с указанным Id из параметров
     /// </summary>
-    public static Event FromUpdateDto(Guid id, UpdateEventDto dto)
+    public static Event FromUpdateDto(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
         return new Event(
             id,
-            dto.Title,
-            dto.Description,
-            dto.StartAt,
-            dto.EndAt
+            title,
+            description,
+            startAt,
+            endAt
         );
     }
 }
