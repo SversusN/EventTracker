@@ -1,22 +1,15 @@
 using System.Net;
-using System.Text.Json;
-using EventTrackerApi.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EventTrackerApi.Middleware;
 
 /// <summary>
 /// MW для глобальной обработки исключений
 /// </summary>
-public class ExceptionHandlingMiddleware
+public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
-
-    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
+    private readonly RequestDelegate _next = next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger = logger;
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -35,38 +28,30 @@ public class ExceptionHandlingMiddleware
     {
         context.Response.ContentType = "application/json";
 
-        var response = exception switch
+        var problemDetails = exception switch
         {
-            ArgumentException => new ErrorResponse
+            ArgumentException => new ProblemDetails
             {
-                StatusCode = (int)HttpStatusCode.BadRequest,
-                Message = exception.Message
+                Status = (int)HttpStatusCode.BadRequest,
+                Title = "Ошибка валидации",
+                Detail = exception.Message
             },
-            KeyNotFoundException => new ErrorResponse
+            KeyNotFoundException => new ProblemDetails
             {
-                StatusCode = (int)HttpStatusCode.NotFound,
-                Message = exception.Message
+                Status = (int)HttpStatusCode.NotFound,
+                Title = "Ресурс не найден",
+                Detail = exception.Message
             },
-            _ => new ErrorResponse
+            _ => new ProblemDetails
             {
-                StatusCode = (int)HttpStatusCode.InternalServerError,
-                Message = "Произошла внутренняя ошибка сервера"
+                Status = (int)HttpStatusCode.InternalServerError,
+                Title = "Внутренняя ошибка сервера",
+                Detail = "Произошла внутренняя ошибка сервера"
             }
         };
 
-        context.Response.StatusCode = response.StatusCode;
+        context.Response.StatusCode = problemDetails.Status ?? (int)HttpStatusCode.InternalServerError;
 
-        var json = JsonSerializer.Serialize(response, JsonOptions.Default);
-
-        return context.Response.WriteAsync(json);
+        return context.Response.WriteAsJsonAsync(problemDetails);
     }
-}
-
-/// <summary>
-/// Модель ответа при ошибке.Модель только для mw
-/// </summary>
-public class ErrorResponse
-{
-    public int StatusCode { get; set; }
-    public string Message { get; set; } = string.Empty;
 }

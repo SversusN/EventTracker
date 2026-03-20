@@ -25,6 +25,22 @@ public class EventsControllerTests
 
     #region GET /events - Получение списка с фильтрацией и пагинацией
 
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(-1, 10)]
+    [InlineData(1, 0)]
+    [InlineData(1, -5)]
+    public void GetEvents_WithInvalidPagination_ReturnsBadRequest(int page, int pageSize)
+    {
+        // Act
+        var result = _controller.GetEvents(page: page, pageSize: pageSize);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        var problemDetails = Assert.IsType<ProblemDetails>(badRequestResult.Value);
+        Assert.Equal(400, problemDetails.Status);
+    }
+
     [Fact]
     public void GetEvents_WithDefaultParameters_ReturnsPaginatedResult()
     {
@@ -237,7 +253,9 @@ public class EventsControllerTests
         var result = _controller.GetEventById(eventId);
 
         // Assert
-        Assert.IsType<NotFoundResult>(result);
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        var problemDetails = Assert.IsType<ProblemDetails>(notFoundResult.Value);
+        Assert.Equal(404, problemDetails.Status);
         
         _eventServiceMock.Verify(s => s.GetEventById(eventId), Times.Once);
     }
@@ -327,7 +345,9 @@ public class EventsControllerTests
         var result = _controller.UpdateEvent(eventId, dto);
 
         // Assert
-        Assert.IsType<NotFoundResult>(result);
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        var problemDetails = Assert.IsType<ProblemDetails>(notFoundResult.Value);
+        Assert.Equal(404, problemDetails.Status);
         
         _eventServiceMock.Verify(s => s.UpdateEvent(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt), Times.Once);
     }
@@ -369,7 +389,9 @@ public class EventsControllerTests
         var result = _controller.DeleteEvent(eventId);
 
         // Assert
-        Assert.IsType<NotFoundResult>(result);
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        var problemDetails = Assert.IsType<ProblemDetails>(notFoundResult.Value);
+        Assert.Equal(404, problemDetails.Status);
         
         _eventServiceMock.Verify(s => s.DeleteEvent(eventId), Times.Once);
     }

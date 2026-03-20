@@ -66,6 +66,8 @@ public class EventService(ILogger<EventService> logger) : IEventService
 
     public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt)
     {
+        ValidateEventData(title, startAt, endAt);
+
         var ev = EventMapper.FromCreateDto(title, description, startAt, endAt);
 
         _events.TryAdd(ev.Id, ev);
@@ -83,6 +85,8 @@ public class EventService(ILogger<EventService> logger) : IEventService
             return null;
         }
 
+        ValidateEventData(title, startAt, endAt);
+
         var updatedEvent = EventMapper.FromUpdateDto(id, title, description, startAt, endAt);
 
         if (!_events.TryUpdate(id, updatedEvent, existingEvent))
@@ -93,6 +97,19 @@ public class EventService(ILogger<EventService> logger) : IEventService
 
         _logger.LogInformation("Updated event with id: {Id}", id);
         return updatedEvent;
+    }
+
+    private static void ValidateEventData(string title, DateTime startAt, DateTime endAt)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            throw new ArgumentException("Title is required.", nameof(title));
+        }
+
+        if (endAt <= startAt)
+        {
+            throw new ArgumentException("EndAt must be later than StartAt.");
+        }
     }
 
     public bool DeleteEvent(Guid id)
