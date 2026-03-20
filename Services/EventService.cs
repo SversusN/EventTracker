@@ -1,23 +1,56 @@
 ﻿using System.Collections.Concurrent;
 using EventTrackerApi.Infrastructure.Mappers;
 using EventTrackerApi.Models;
+using EventTrackerApi.Models.Dto;
 
 namespace EventTrackerApi.Services;
 
-public class EventService : IEventService
+public class EventService(ILogger<EventService> logger) : IEventService
 {
     private readonly ConcurrentDictionary<Guid, Event> _events = new();
-    private readonly ILogger<EventService> _logger;
+    private readonly ILogger<EventService> _logger = logger;
 
-    public EventService(ILogger<EventService> logger)
+    public PaginatedResult<Event> GetEvents(string? title = null, DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 10)
     {
-        _logger = logger;
-    }
+        _logger.LogInformation("Getting events with filters. Title: {Title}, From: {From}, To: {To}, Page: {Page}, PageSize: {PageSize}", title, from, to, page, pageSize);
 
-    public IEnumerable<Event> GetAllEvents()
-    {
-        _logger.LogInformation("Getting all events. Count: {Count}", _events.Count);
-        return _events.Values;
+        var query = _events.Values.AsEnumerable();
+
+        // Фильтрация по названию (регистронезависимая, частичное совпадение)
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Фильтрация по дате начала (события, которые начинаются не раньше указанной даты)
+        if (from.HasValue)
+        {
+            query = query.Where(e => e.StartAt >= from.Value);
+        }
+
+        // Фильтрация по дате окончания (события, которые заканчиваются не позже указанной даты)
+        if (to.HasValue)
+        {
+            query = query.Where(e => e.EndAt <= to.Value);
+        }
+
+        var totalCount = query.Count();
+
+        // Применяем пагинацию
+        var items = query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        _logger.LogInformation("Found {TotalCount} events, returning {Count} items for page {Page}", totalCount, items.Count, page);
+
+        return new PaginatedResult<Event>
+        {
+            TotalCount = totalCount,
+            Items = items,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public Event? GetEventById(Guid id)

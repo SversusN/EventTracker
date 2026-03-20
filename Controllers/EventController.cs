@@ -1,5 +1,4 @@
-﻿using EventTrackerApi.Infrastructure.Mappers;
-using EventTrackerApi.Models.Dto;
+﻿using EventTrackerApi.Models.Dto;
 using EventTrackerApi.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,16 +11,37 @@ namespace EventTrackerApi.Controllers;
 [Route("events")]
 public class EventsController(IEventService eventService) : ControllerBase
 {
+    private readonly IEventService _eventService = eventService;
+
     /// <summary>
-    /// Получить список всех событий
+    /// Получить список событий с фильтрацией и пагинацией
     /// </summary>
-    /// <returns>Список событий</returns>
+    /// <param name="title">Поиск по названию (частичное совпадение, регистронезависимый)</param>
+    /// <param name="from">События, начинающиеся не раньше указанной даты</param>
+    /// <param name="to">События, заканчивающиеся не позже указанной даты</param>
+    /// <param name="page">Номер страницы (начиная с 1)</param>
+    /// <param name="pageSize">Количество элементов на странице</param>
+    /// <returns>Список событий с информацией о пагинации</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<EventResponseDto>), StatusCodes.Status200OK)]
-    public IActionResult GetAllEvents()
+    [ProducesResponseType(typeof(PaginatedResult<EventResponseDto>), StatusCodes.Status200OK)]
+    public IActionResult GetEvents(
+        [FromQuery] string? title = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var events = eventService.GetAllEvents();
-        return Ok(EventMapper.ToResponseDtoList(events));
+        var result = _eventService.GetEvents(title, from, to, page, pageSize);
+
+        var response = new PaginatedResult<EventResponseDto>
+        {
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize,
+            Items = Infrastructure.Mappers.EventMapper.ToResponseDtoList(result.Items)
+        };
+
+        return Ok(response);
     }
 
     /// <summary>
@@ -34,12 +54,12 @@ public class EventsController(IEventService eventService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetEventById(Guid id)
     {
-        var ev = eventService.GetEventById(id);
+        var ev = _eventService.GetEventById(id);
         if (ev is null)
         {
             return NotFound();
         }
-        return Ok(EventMapper.ToResponseDto(ev));
+        return Ok(Infrastructure.Mappers.EventMapper.ToResponseDto(ev));
     }
 
     /// <summary>
@@ -57,8 +77,8 @@ public class EventsController(IEventService eventService) : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var createdEvent = eventService.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt);
-        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, EventMapper.ToResponseDto(createdEvent));
+        var createdEvent = _eventService.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt);
+        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, Infrastructure.Mappers.EventMapper.ToResponseDto(createdEvent));
     }
 
     /// <summary>
@@ -78,12 +98,12 @@ public class EventsController(IEventService eventService) : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var updatedEvent = eventService.UpdateEvent(id, dto.Title, dto.Description, dto.StartAt, dto.EndAt);
+        var updatedEvent = _eventService.UpdateEvent(id, dto.Title, dto.Description, dto.StartAt, dto.EndAt);
         if (updatedEvent is null)
         {
             return NotFound();
         }
-        return Ok(EventMapper.ToResponseDto(updatedEvent));
+        return Ok(Infrastructure.Mappers.EventMapper.ToResponseDto(updatedEvent));
     }
 
     /// <summary>
@@ -96,7 +116,7 @@ public class EventsController(IEventService eventService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult DeleteEvent(Guid id)
     {
-        var deleted = eventService.DeleteEvent(id);
+        var deleted = _eventService.DeleteEvent(id);
         if (!deleted)
         {
             return NotFound();
