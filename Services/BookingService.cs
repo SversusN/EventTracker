@@ -18,7 +18,7 @@ public class BookingService : IBookingService
         _logger = logger;
     }
 
-    public Task<Booking?> CreateBookingAsync(Guid eventId)
+    public async Task<Booking?> CreateBookingAsync(Guid eventId)
     {
         _logger.LogInformation("Creating booking for event {EventId}", eventId);
 
@@ -27,7 +27,7 @@ public class BookingService : IBookingService
         if (eventItem is null)
         {
             _logger.LogWarning("Cannot create booking: event {EventId} not found", eventId);
-            return Task.FromResult<Booking?>(null);
+            return null;
         }
 
         // Создаём бронь в статусе Pending
@@ -37,23 +37,23 @@ public class BookingService : IBookingService
         _logger.LogInformation("Created booking {BookingId} for event {EventId} with status {Status}",
             booking.Id, eventId, booking.Status);
 
-        return Task.FromResult<Booking?>(booking);
+        return booking;
     }
 
-    public Task<Booking?> GetBookingByIdAsync(Guid bookingId)
+    public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
     {
         _logger.LogInformation("Getting booking by id: {BookingId}", bookingId);
 
         if (!_bookings.TryGetValue(bookingId, out var booking))
         {
             _logger.LogWarning("Booking with id {BookingId} not found", bookingId);
-            return Task.FromResult<Booking?>(null);
+            return null;
         }
 
-        return Task.FromResult<Booking?>(booking);
+        return booking;
     }
 
-    public Task<IEnumerable<Booking>> GetBookingsByStatusAsync(BookingStatus status)
+    public async Task<IEnumerable<Booking>> GetBookingsByStatusAsync(BookingStatus status)
     {
         _logger.LogInformation("Getting bookings by status: {Status}", status);
 
@@ -61,10 +61,10 @@ public class BookingService : IBookingService
             .Where(b => b.Status == status)
             .ToList();
 
-        return Task.FromResult<IEnumerable<Booking>>(bookings);
+        return bookings;
     }
 
-    public Task<bool> UpdateBookingAsync(Booking booking)
+    public async Task<bool> UpdateBookingAsync(Booking booking)
     {
         _logger.LogInformation("Updating booking {BookingId} with status {Status}",
             booking.Id, booking.Status);
@@ -72,10 +72,10 @@ public class BookingService : IBookingService
         if (!_bookings.ContainsKey(booking.Id))
         {
             _logger.LogWarning("Cannot update booking {BookingId}: not found", booking.Id);
-            return Task.FromResult(false);
+            return false;
         }
 
         _bookings[booking.Id] = booking;
-        return Task.FromResult(true);
+        return true;
     }
 }

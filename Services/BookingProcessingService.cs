@@ -36,6 +36,7 @@ public class BookingProcessingService(
     private async Task ProcessPendingBookingsAsync(CancellationToken cancellationToken)
     {
         using var scope = serviceProvider.CreateScope();
+        //Scope должен существовать только на время одной итерации обработки.
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
         // Получаем все брони в статусе Pending
