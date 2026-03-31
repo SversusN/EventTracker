@@ -6,21 +6,20 @@ using EventTrackerApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
 
 namespace EventTrackerApi.Tests;
 
 public class EventsControllerTests
 {
     private readonly Mock<IEventService> _eventServiceMock;
-    private readonly Mock<ILogger<EventsController>> _loggerMock;
+    private readonly Mock<IBookingService> _bookingServiceMock;
     private readonly EventsController _controller;
 
     public EventsControllerTests()
     {
         _eventServiceMock = new Mock<IEventService>();
-        _loggerMock = new Mock<ILogger<EventsController>>();
-        _controller = new EventsController(_eventServiceMock.Object);
+        _bookingServiceMock = new Mock<IBookingService>();
+        _controller = new EventsController(_eventServiceMock.Object, _bookingServiceMock.Object);
     }
 
     #region GET /events - Получение списка с фильтрацией и пагинацией

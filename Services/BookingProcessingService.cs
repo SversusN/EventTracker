@@ -6,7 +6,7 @@ namespace EventTrackerApi.Services;
 /// Фоновый сервис для обработки бронирований
 /// </summary>
 public class BookingProcessingService(
-    IServiceProvider serviceProvider,
+    IServiceScopeFactory scopeFactory,
     ILogger<BookingProcessingService> logger) : BackgroundService
 {
     private readonly TimeSpan _processingInterval = TimeSpan.FromSeconds(5);
@@ -35,7 +35,7 @@ public class BookingProcessingService(
 
     private async Task ProcessPendingBookingsAsync(CancellationToken cancellationToken)
     {
-        using var scope = serviceProvider.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         //Scope должен существовать только на время одной итерации обработки.
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
