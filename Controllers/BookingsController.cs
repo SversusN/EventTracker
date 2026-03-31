@@ -10,14 +10,8 @@ namespace EventTrackerApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("bookings")]
-public class BookingsController : ControllerBase
+public class BookingsController(IBookingService bookingService) : ControllerBase
 {
-    private readonly IBookingService _bookingService;
-
-    public BookingsController(IBookingService bookingService)
-    {
-        _bookingService = bookingService;
-    }
 
     /// <summary>
     /// Получить бронирование по идентификатору
@@ -29,7 +23,7 @@ public class BookingsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetBookingById(Guid id)
     {
-        var booking = await _bookingService.GetBookingByIdAsync(id);
+        var booking = await bookingService.GetBookingByIdAsync(id);
         if (booking is null)
         {
             return NotFound(ProblemDetailsHelper.NotFound("Бронирование", id));
