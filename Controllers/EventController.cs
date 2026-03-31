@@ -10,9 +10,10 @@ namespace EventTrackerApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("events")]
-public class EventsController(IEventService eventService) : ControllerBase
+public class EventsController(IEventService eventService, IBookingService bookingService) : ControllerBase
 {
     private readonly IEventService _eventService = eventService;
+    private readonly IBookingService _bookingService = bookingService;
 
     /// <summary>
     /// Получить список событий с фильтрацией и пагинацией
@@ -134,5 +135,37 @@ public class EventsController(IEventService eventService) : ControllerBase
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
         }
         return NoContent();
+    }
+
+    /// <summary>
+    /// Создать бронь для события
+    /// </summary>
+    /// <param name="id">Идентификатор события</param>
+    /// <returns>Созданная бронь со статусом Pending</returns>
+    [HttpPost("{id:guid}/book")]
+    [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CreateBooking(Guid id)
+    {
+        var booking = await _bookingService.CreateBookingAsync(id);
+        if (booking is null)
+        {
+            return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
+        }
+
+        var response = new BookingResponseDto(
+            booking.Id,
+            booking.EventId,
+            booking.Status,
+            booking.CreatedAt,
+            booking.ProcessedAt
+        );
+
+        // Возвращаем 202 Accepted с заголовком Location
+        return AcceptedAtAction(
+            actionName: nameof(BookingsController.GetBookingById),
+            controllerName: "bookings",
+            routeValues: new { id = booking.Id },
+            value: response);
     }
 }
