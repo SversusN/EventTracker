@@ -1,4 +1,4 @@
-﻿using EventTrackerApi.Infrastructure;
+using EventTrackerApi.Infrastructure;
 using EventTrackerApi.Models.Dto;
 using EventTrackerApi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -90,7 +90,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
             return ValidationProblem(ModelState);
         }
 
-        var createdEvent = _eventService.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt);
+        var createdEvent = _eventService.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats);
         return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, Infrastructure.Mappers.EventMapper.ToResponseDto(createdEvent));
     }
 
@@ -145,13 +145,10 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [HttpPost("{id:guid}/book")]
     [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
         var booking = await _bookingService.CreateBookingAsync(id);
-        if (booking is null)
-        {
-            return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
-        }
 
         var response = new BookingResponseDto(
             booking.Id,
