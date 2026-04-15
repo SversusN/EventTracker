@@ -1,4 +1,4 @@
-﻿using EventTrackerApi.Models;
+using EventTrackerApi.Models;
 using EventTrackerApi.Models.Dto;
 
 namespace EventTrackerApi.Infrastructure.Mappers;
@@ -18,7 +18,9 @@ public static class EventMapper
             ev.Title,
             ev.Description,
             ev.StartAt,
-            ev.EndAt
+            ev.EndAt,
+            ev.TotalSeats,
+            ev.AvailableSeats
         );
     }
 
@@ -33,27 +35,30 @@ public static class EventMapper
     /// <summary>
     /// Создаёт новый Event из параметров
     /// </summary>
-    public static Event FromCreateDto(string title, string? description, DateTime startAt, DateTime endAt)
+    public static Event FromCreateDto(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
         return new Event(
             title,
             description,
             startAt,
-            endAt
+            endAt,
+            totalSeats
         );
     }
 
     /// <summary>
     /// Создаёт Event с указанным Id из параметров
     /// </summary>
-    public static Event FromUpdateDto(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
+    public static Event FromUpdateDto(Guid id, string title, string? description, DateTime startAt, DateTime endAt, int totalSeats, int availableSeats)
     {
         return new Event(
             id,
             title,
             description,
             startAt,
-            endAt
+            endAt,
+            totalSeats,
+            availableSeats
         );
     }
 }

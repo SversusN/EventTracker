@@ -11,6 +11,7 @@ public class BookingProcessingService(
 {
     private readonly TimeSpan _processingInterval = TimeSpan.FromSeconds(5);
     private readonly TimeSpan _artificialDelay = TimeSpan.FromSeconds(2);
+    private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -22,12 +23,20 @@ public class BookingProcessingService(
             {
                 await ProcessPendingBookingsAsync(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Error processing pending bookings");
             }
 
-            await Task.Delay(_processingInterval, stoppingToken);
+            try
+            {
+                await Task.Delay(_processingInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation("Booking processing service delay was cancelled");
+                throw;
+            }
         }
 
         logger.LogInformation("Booking processing service stopped");
@@ -36,43 +45,89 @@ public class BookingProcessingService(
     private async Task ProcessPendingBookingsAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
-        //Scope должен существовать только на время одной итерации обработки.
         var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+        var eventService = scope.ServiceProvider.GetRequiredService<IEventService>();
 
         // Получаем все брони в статусе Pending
         var pendingBookings = await bookingService.GetBookingsByStatusAsync(BookingStatus.Pending);
+        var pendingList = pendingBookings.ToList();
 
-        foreach (var booking in pendingBookings)
+        if (pendingList.Count > 0)
         {
-            if (cancellationToken.IsCancellationRequested)
+            logger.LogInformation("Found {Count} pending bookings to process", pendingList.Count);
+        }
+
+        var tasks = pendingList.Select(booking => ProcessBookingAsync(booking, eventService, bookingService, cancellationToken));
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task ProcessBookingAsync(
+        Booking booking,
+        IEventService eventService,
+        IBookingService bookingService,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("Processing booking {BookingId} for event {EventId}",
+            booking.Id, booking.EventId);
+
+        try
+        {
+            // Искусственная задержка выполняется до захвата семафора, так задержки выполняются параллельно
+            await Task.Delay(_artificialDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Processing delay of booking {BookingId} was cancelled", booking.Id);
+            throw;
+        }
+
+        await _processingSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            // Проверяем, существует ли событие в хранилище
+            var eventItem = eventService.GetEventById(booking.EventId);
+            if (eventItem is null)
             {
-                break;
+                logger.LogWarning("Event {EventId} not found for booking {BookingId}. Rejecting booking.",
+                    booking.EventId, booking.Id);
+                booking.Reject();
+                await bookingService.UpdateBookingAsync(booking);
+                return;
             }
 
+            // Подтверждаем бронь
+            booking.Confirm();
+            await bookingService.UpdateBookingAsync(booking);
+
+            logger.LogInformation("Booking {BookingId} confirmed at {ProcessedAt}",
+                booking.Id, booking.ProcessedAt);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Processing of booking {BookingId} was cancelled", booking.Id);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error processing booking {BookingId}", booking.Id);
+
+            // При неожиданной ошибке отклоняем бронь и возвращаем место
             try
             {
-                logger.LogInformation("Processing booking {BookingId} for event {EventId}",
-                    booking.Id, booking.EventId);
-
-                // Искусственная задержка, имитирующая обращение к внешней системе
-                await Task.Delay(_artificialDelay, cancellationToken);
-
-                // Пока просто подтверждаем все брони (в следующих спринтах будет логика выбора)
-                booking.Confirm();
+                var eventItem = eventService.GetEventById(booking.EventId);
+                eventItem?.ReleaseSeats();
+                booking.Reject();
                 await bookingService.UpdateBookingAsync(booking);
-
-                logger.LogInformation("Booking {BookingId} confirmed at {ProcessedAt}",
-                    booking.Id, booking.ProcessedAt);
+                logger.LogInformation("Booking {BookingId} rejected and seats released due to error", booking.Id);
             }
-            catch (OperationCanceledException)
+            catch (Exception innerEx)
             {
-                logger.LogWarning("Processing of booking {BookingId} was cancelled", booking.Id);
-                throw;
+                logger.LogError(innerEx, "Failed to reject booking {BookingId} after error", booking.Id);
             }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error processing booking {BookingId}", booking.Id);
-            }
+        }
+        finally
+        {
+            _processingSemaphore.Release();
         }
     }
 }
