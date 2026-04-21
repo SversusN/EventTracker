@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
+using EventTrackerApi.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventTrackerApi.Middleware;
@@ -36,10 +38,22 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 Title = "Ошибка валидации",
                 Detail = exception.Message
             },
+            ValidationException => new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.BadRequest,
+                Title = "Ошибка валидации",
+                Detail = exception.Message
+            },
             KeyNotFoundException => new ProblemDetails
             {
                 Status = (int)HttpStatusCode.NotFound,
                 Title = "Ресурс не найден",
+                Detail = exception.Message
+            },
+            NoAvailableSeatsException => new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.Conflict,
+                Title = "Нет свободных мест",
                 Detail = exception.Message
             },
             _ => new ProblemDetails

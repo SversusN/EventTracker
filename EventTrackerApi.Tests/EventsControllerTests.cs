@@ -1,10 +1,10 @@
 using EventTrackerApi.Controllers;
+using EventTrackerApi.Exceptions;
 using EventTrackerApi.Infrastructure.Mappers;
 using EventTrackerApi.Models;
 using EventTrackerApi.Models.Dto;
 using EventTrackerApi.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace EventTrackerApi.Tests;
@@ -46,8 +46,8 @@ public class EventsControllerTests
         // Arrange
         var events = new List<Event>
         {
-            new("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1)),
-            new("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1))
+            new("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10),
+            new("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10)
         };
         
         var paginatedResult = new PaginatedResult<Event>
@@ -81,7 +81,7 @@ public class EventsControllerTests
         var titleFilter = "Meeting";
         var events = new List<Event>
         {
-            new("Team Meeting", null, DateTime.Now, DateTime.Now.AddHours(1))
+            new("Team Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10)
         };
         
         var paginatedResult = new PaginatedResult<Event>
@@ -115,7 +115,7 @@ public class EventsControllerTests
         var toDate = new DateTime(2024, 12, 31);
         var events = new List<Event>
         {
-            new("Event", null, fromDate.AddMonths(1), fromDate.AddMonths(1).AddHours(1))
+            new("Event", null, fromDate.AddMonths(1), fromDate.AddMonths(1).AddHours(1), 10)
         };
         
         var paginatedResult = new PaginatedResult<Event>
@@ -148,7 +148,7 @@ public class EventsControllerTests
         var pageSize = 5;
         var events = new List<Event>
         {
-            new("Event 6", null, DateTime.Now, DateTime.Now.AddHours(1))
+            new("Event 6", null, DateTime.Now, DateTime.Now.AddHours(1), 10)
         };
         
         var paginatedResult = new PaginatedResult<Event>
@@ -186,7 +186,7 @@ public class EventsControllerTests
         
         var events = new List<Event>
         {
-            new("Team Meeting", null, fromDate.AddMonths(1), fromDate.AddMonths(1).AddHours(1))
+            new("Team Meeting", null, fromDate.AddMonths(1), fromDate.AddMonths(1).AddHours(1), 10)
         };
         
         var paginatedResult = new PaginatedResult<Event>
@@ -221,7 +221,7 @@ public class EventsControllerTests
     {
         // Arrange
         var eventId = Guid.NewGuid();
-        var ev = new Event("Test Event", null, DateTime.Now, DateTime.Now.AddHours(1));
+        var ev = new Event("Test Event", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         
         _eventServiceMock
             .Setup(s => s.GetEventById(eventId))
@@ -271,13 +271,14 @@ public class EventsControllerTests
             "New Event",
             "Description",
             DateTime.Now,
-            DateTime.Now.AddHours(1)
+            DateTime.Now.AddHours(1),
+            100
         );
         
-        var createdEvent = new Event(dto.Title, dto.Description, dto.StartAt, dto.EndAt);
+        var createdEvent = new Event(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats);
         
         _eventServiceMock
-            .Setup(s => s.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt))
+            .Setup(s => s.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats))
             .Returns(createdEvent);
 
         // Act
@@ -288,7 +289,7 @@ public class EventsControllerTests
         Assert.Equal(nameof(EventsController.GetEventById), createdAtActionResult.ActionName);
         Assert.Equal(createdEvent.Id, ((EventResponseDto)createdAtActionResult.Value!).Id);
         
-        _eventServiceMock.Verify(s => s.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt), Times.Once);
+        _eventServiceMock.Verify(s => s.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats), Times.Once);
     }
 
     #endregion
@@ -307,7 +308,7 @@ public class EventsControllerTests
             DateTime.Now.AddHours(2)
         );
         
-        var updatedEvent = new Event(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt);
+        var updatedEvent = new Event(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt, 100, 100);
         
         _eventServiceMock
             .Setup(s => s.UpdateEvent(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt))
@@ -393,6 +394,60 @@ public class EventsControllerTests
         Assert.Equal(404, problemDetails.Status);
         
         _eventServiceMock.Verify(s => s.DeleteEvent(eventId), Times.Once);
+    }
+
+    #endregion
+
+    #region POST /events/{id}/book - Создание брони
+
+    [Fact]
+    public async Task CreateBooking_WithExistingEvent_ReturnsAccepted()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var booking = new Booking(eventId);
+        
+        _bookingServiceMock
+            .Setup(s => s.CreateBookingAsync(eventId))
+            .ReturnsAsync(booking);
+
+        // Act
+        var result = await _controller.CreateBooking(eventId);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedAtActionResult>(result);
+        var response = Assert.IsType<BookingResponseDto>(acceptedResult.Value);
+        Assert.Equal(booking.Id, response.Id);
+        
+        _bookingServiceMock.Verify(s => s.CreateBookingAsync(eventId), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateBooking_WhenNoSeatsAvailable_PropagatesNoAvailableSeatsException()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        
+        _bookingServiceMock
+            .Setup(s => s.CreateBookingAsync(eventId))
+            .ThrowsAsync(new NoAvailableSeatsException("No available seats for this event"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(() => _controller.CreateBooking(eventId));
+    }
+
+    [Fact]
+    public async Task CreateBooking_WhenEventNotFound_PropagatesKeyNotFoundException()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        
+        _bookingServiceMock
+            .Setup(s => s.CreateBookingAsync(eventId))
+            .ThrowsAsync(new KeyNotFoundException($"Event with id '{eventId}' not found."));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.CreateBooking(eventId));
     }
 
     #endregion

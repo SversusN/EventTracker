@@ -26,9 +26,10 @@ public class EventServiceTests
         var description = "Test Description";
         var startAt = DateTime.Now;
         var endAt = DateTime.Now.AddHours(1);
+        var totalSeats = 100;
 
         // Act
-        var result = _eventService.CreateEvent(title, description, startAt, endAt);
+        var result = _eventService.CreateEvent(title, description, startAt, endAt, totalSeats);
 
         // Assert
         Assert.NotNull(result);
@@ -36,13 +37,17 @@ public class EventServiceTests
         Assert.Equal(description, result.Description);
         Assert.Equal(startAt, result.StartAt);
         Assert.Equal(endAt, result.EndAt);
+        Assert.Equal(totalSeats, result.TotalSeats);
+        Assert.Equal(totalSeats, result.AvailableSeats);
         Assert.NotEqual(Guid.Empty, result.Id);
     }
 
     [Theory]
-    [InlineData("", "Description", "2026-01-01", "2026-01-02")]
-    [InlineData("Title", "Description", "2026-01-05", "2026-01-01")]
-    public void CreateEvent_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr)
+    [InlineData("", "Description", "2026-01-01", "2026-01-02", 10)]
+    [InlineData("Title", "Description", "2026-01-05", "2026-01-01", 10)]
+    [InlineData("Title", "Description", "2026-01-01", "2026-01-02", 0)]
+    [InlineData("Title", "Description", "2026-01-01", "2026-01-02", -1)]
+    public void CreateEvent_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr, int totalSeats)
     {
         // Arrange
         var startAt = DateTime.Parse(startAtStr);
@@ -50,7 +55,7 @@ public class EventServiceTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            _eventService.CreateEvent(title, description, startAt, endAt));
+            _eventService.CreateEvent(title, description, startAt, endAt, totalSeats));
     }
 
     #endregion
@@ -75,9 +80,9 @@ public class EventServiceTests
     public void GetEvents_WithMultipleEvents_ReturnsAllEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Event 3", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Event 3", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents();
@@ -95,7 +100,7 @@ public class EventServiceTests
     public void GetEventById_WithExistingId_ReturnsEvent()
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Test", null, DateTime.Now, DateTime.Now.AddHours(1));
+        var createdEvent = _eventService.CreateEvent("Test", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEventById(createdEvent.Id);
@@ -124,7 +129,7 @@ public class EventServiceTests
     public void UpdateEvent_WithExistingId_ReturnsUpdatedEvent()
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Original", null, DateTime.Now, DateTime.Now.AddHours(1));
+        var createdEvent = _eventService.CreateEvent("Original", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         var newTitle = "Updated Title";
         var newDescription = "Updated Description";
         var newStartAt = DateTime.Now.AddDays(1);
@@ -139,6 +144,8 @@ public class EventServiceTests
         Assert.Equal(newDescription, result.Description);
         Assert.Equal(newStartAt, result.StartAt);
         Assert.Equal(newEndAt, result.EndAt);
+        Assert.Equal(createdEvent.TotalSeats, result.TotalSeats);
+        Assert.Equal(createdEvent.AvailableSeats, result.AvailableSeats);
     }
 
     [Fact]
@@ -157,7 +164,7 @@ public class EventServiceTests
     public void UpdateEvent_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr)
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Original", null, DateTime.Now, DateTime.Now.AddHours(1));
+        var createdEvent = _eventService.CreateEvent("Original", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         var startAt = DateTime.Parse(startAtStr);
         var endAt = DateTime.Parse(endAtStr);
 
@@ -174,7 +181,7 @@ public class EventServiceTests
     public void DeleteEvent_WithExistingId_ReturnsTrue()
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Test", null, DateTime.Now, DateTime.Now.AddHours(1));
+        var createdEvent = _eventService.CreateEvent("Test", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.DeleteEvent(createdEvent.Id);
@@ -202,9 +209,9 @@ public class EventServiceTests
     public void GetEvents_WithTitleFilter_ReturnsMatchingEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Team Meeting", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Team Project", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Lunch", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Team Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Team Project", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Lunch", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(title: "Team");
@@ -218,7 +225,7 @@ public class EventServiceTests
     public void GetEvents_WithTitleFilter_CaseInsensitive()
     {
         // Arrange
-        _eventService.CreateEvent("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(title: "meeting");
@@ -231,7 +238,7 @@ public class EventServiceTests
     public void GetEvents_WithTitleFilter_PartialMatch()
     {
         // Arrange
-        _eventService.CreateEvent("Team Meeting Today", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Team Meeting Today", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(title: "Meet");
@@ -244,8 +251,8 @@ public class EventServiceTests
     public void GetEvents_WithEmptyTitleFilter_ReturnsAllEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(title: "");
@@ -263,8 +270,8 @@ public class EventServiceTests
     {
         // Arrange
         var baseDate = new DateTime(2026, 1, 1);
-        _eventService.CreateEvent("Past", null, baseDate.AddDays(-1), baseDate.AddDays(-1).AddHours(1));
-        _eventService.CreateEvent("Future", null, baseDate.AddDays(1), baseDate.AddDays(1).AddHours(1));
+        _eventService.CreateEvent("Past", null, baseDate.AddDays(-1), baseDate.AddDays(-1).AddHours(1), 10);
+        _eventService.CreateEvent("Future", null, baseDate.AddDays(1), baseDate.AddDays(1).AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(from: baseDate);
@@ -279,8 +286,8 @@ public class EventServiceTests
     {
         // Arrange
         var baseDate = new DateTime(2026, 1, 15);
-        _eventService.CreateEvent("Early", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1));
-        _eventService.CreateEvent("Late", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1));
+        _eventService.CreateEvent("Early", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1), 10);
+        _eventService.CreateEvent("Late", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(to: baseDate);
@@ -297,9 +304,9 @@ public class EventServiceTests
         var fromDate = new DateTime(2026, 1, 1);
         var toDate = new DateTime(2026, 1, 31);
         
-        _eventService.CreateEvent("Before", null, fromDate.AddDays(-5), fromDate.AddDays(-5).AddHours(1));
-        _eventService.CreateEvent("In Range", null, fromDate.AddDays(10), fromDate.AddDays(10).AddHours(1));
-        _eventService.CreateEvent("After", null, toDate.AddDays(5), toDate.AddDays(5).AddHours(1));
+        _eventService.CreateEvent("Before", null, fromDate.AddDays(-5), fromDate.AddDays(-5).AddHours(1), 10);
+        _eventService.CreateEvent("In Range", null, fromDate.AddDays(10), fromDate.AddDays(10).AddHours(1), 10);
+        _eventService.CreateEvent("After", null, toDate.AddDays(5), toDate.AddDays(5).AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(from: fromDate, to: toDate);
@@ -319,7 +326,7 @@ public class EventServiceTests
         // Arrange
         for (int i = 1; i <= 25; i++)
         {
-            _eventService.CreateEvent($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1));
+            _eventService.CreateEvent($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         }
 
         // Act
@@ -338,7 +345,7 @@ public class EventServiceTests
         // Arrange
         for (int i = 1; i <= 25; i++)
         {
-            _eventService.CreateEvent($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1));
+            _eventService.CreateEvent($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         }
 
         // Act
@@ -352,7 +359,7 @@ public class EventServiceTests
     public void GetEvents_WithPageBeyondRange_ReturnsEmptyList()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(page: 10, pageSize: 10);
@@ -371,10 +378,10 @@ public class EventServiceTests
         // Arrange
         var baseDate = new DateTime(2026, 6, 1);
         
-        _eventService.CreateEvent("Meeting", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1));
-        _eventService.CreateEvent("Client Meeting", null, baseDate.AddDays(10), baseDate.AddDays(10).AddHours(1));
-        _eventService.CreateEvent("Lunch", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1)); // До from
-        _eventService.CreateEvent("Review", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1)); // Не содержит "Meeting"
+        _eventService.CreateEvent("Meeting", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10);
+        _eventService.CreateEvent("Client Meeting", null, baseDate.AddDays(10), baseDate.AddDays(10).AddHours(1), 10);
+        _eventService.CreateEvent("Lunch", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1), 10); // До from
+        _eventService.CreateEvent("Review", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10); // Не содержит "Meeting"
 
         // Act
         var result = _eventService.GetEvents(
@@ -396,8 +403,8 @@ public class EventServiceTests
     public void GetEvents_WithWhitespaceTitleFilter_ReturnsAllEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(title: "   ");
@@ -410,8 +417,8 @@ public class EventServiceTests
     public void GetEvents_WithNonMatchingTitleFilter_ReturnsEmptyResult()
     {
         // Arrange
-        _eventService.CreateEvent("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1));
-        _eventService.CreateEvent("Project", null, DateTime.Now, DateTime.Now.AddHours(1));
+        _eventService.CreateEvent("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        _eventService.CreateEvent("Project", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
         var result = _eventService.GetEvents(title: "NonExistent");
@@ -426,7 +433,7 @@ public class EventServiceTests
     {
         // Arrange
         var baseDate = new DateTime(2026, 1, 15);
-        _eventService.CreateEvent("Event", null, baseDate, baseDate.AddHours(1));
+        _eventService.CreateEvent("Event", null, baseDate, baseDate.AddHours(1), 10);
 
         // Act - from позже to, такой фильтр логически невозможен
         var result = _eventService.GetEvents(
@@ -444,8 +451,8 @@ public class EventServiceTests
     {
         // Arrange
         var exactDate = new DateTime(2026, 6, 15, 10, 0, 0);
-        _eventService.CreateEvent("Exact Start", null, exactDate, exactDate.AddHours(2));
-        _eventService.CreateEvent("Exact End", null, exactDate.AddHours(-2), exactDate);
+        _eventService.CreateEvent("Exact Start", null, exactDate, exactDate.AddHours(2), 10);
+        _eventService.CreateEvent("Exact End", null, exactDate.AddHours(-2), exactDate, 10);
 
         // Act - фильтр включает граничные значения
         var resultFrom = _eventService.GetEvents(from: exactDate);

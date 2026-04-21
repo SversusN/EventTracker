@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using EventTrackerApi.Infrastructure.Mappers;
 using EventTrackerApi.Models;
 using EventTrackerApi.Models.Dto;
@@ -64,15 +64,15 @@ public class EventService(ILogger<EventService> logger) : IEventService
         return ev;
     }
 
-    public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt)
+    public Event CreateEvent(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
-        ValidateEventData(title, startAt, endAt);
+        ValidateEventData(title, startAt, endAt, totalSeats);
 
-        var ev = EventMapper.FromCreateDto(title, description, startAt, endAt);
+        var ev = EventMapper.FromCreateDto(title, description, startAt, endAt, totalSeats);
 
         _events.TryAdd(ev.Id, ev);
 
-        _logger.LogInformation("Created event with id: {Id}, title: {Title}", ev.Id, ev.Title);
+        _logger.LogInformation("Created event with id: {Id}, title: {Title}, totalSeats: {TotalSeats}", ev.Id, ev.Title, ev.TotalSeats);
         return ev;
     }
 
@@ -85,9 +85,9 @@ public class EventService(ILogger<EventService> logger) : IEventService
             return null;
         }
 
-        ValidateEventData(title, startAt, endAt);
+        ValidateEventData(title, startAt, endAt, existingEvent.TotalSeats);
 
-        var updatedEvent = EventMapper.FromUpdateDto(id, title, description, startAt, endAt);
+        var updatedEvent = EventMapper.FromUpdateDto(id, title, description, startAt, endAt, existingEvent.TotalSeats, existingEvent.AvailableSeats);
 
         if (!_events.TryUpdate(id, updatedEvent, existingEvent))
         {
@@ -99,7 +99,7 @@ public class EventService(ILogger<EventService> logger) : IEventService
         return updatedEvent;
     }
 
-    private static void ValidateEventData(string title, DateTime startAt, DateTime endAt)
+    private static void ValidateEventData(string title, DateTime startAt, DateTime endAt, int totalSeats)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -109,6 +109,11 @@ public class EventService(ILogger<EventService> logger) : IEventService
         if (endAt <= startAt)
         {
             throw new ArgumentException("EndAt must be later than StartAt.");
+        }
+
+        if (totalSeats <= 0)
+        {
+            throw new ArgumentException("TotalSeats must be greater than 0.", nameof(totalSeats));
         }
     }
 

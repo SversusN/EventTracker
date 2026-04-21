@@ -12,7 +12,11 @@ public record CreateEventDto(
     DateTime StartAt,
 
     [Required]
-    DateTime EndAt
+    DateTime EndAt,
+
+    [Required(ErrorMessage = "TotalSeats is required.")]
+    [Range(1, int.MaxValue, ErrorMessage = "TotalSeats must be greater than 0.")]
+    int TotalSeats
 ) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
