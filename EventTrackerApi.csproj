@@ -15,7 +15,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="EventApi_Sprint5\**\*.cs" />
+    <Content Remove="EventApi_Sprint5\**\*" />
+    <None Remove="EventApi_Sprint5\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
   </ItemGroup>
 

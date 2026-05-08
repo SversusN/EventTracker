@@ -27,7 +27,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResult<EventResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public IActionResult GetEvents(
+    public async Task<IActionResult> GetEvents(
         [FromQuery] string? title = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
@@ -44,7 +44,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
             return BadRequest(ProblemDetailsHelper.InvalidPageSize());
         }
 
-        var result = _eventService.GetEvents(title, from, to, page, pageSize);
+        var result = await _eventService.GetEventsAsync(title, from, to, page, pageSize);
 
         var response = new PaginatedResult<EventResponseDto>
         {
@@ -65,9 +65,9 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public IActionResult GetEventById(Guid id)
+    public async Task<IActionResult> GetEventById(Guid id)
     {
-        var ev = _eventService.GetEventById(id);
+        var ev = await _eventService.GetEventByIdAsync(id);
         if (ev is null)
         {
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
@@ -83,14 +83,14 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [HttpPost]
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public IActionResult CreateEvent([FromBody] CreateEventDto dto)
+    public async Task<IActionResult> CreateEvent([FromBody] CreateEventDto dto)
     {
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        var createdEvent = _eventService.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats);
+        var createdEvent = await _eventService.CreateEventAsync(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats);
         return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, Infrastructure.Mappers.EventMapper.ToResponseDto(createdEvent));
     }
 
@@ -104,14 +104,14 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public IActionResult UpdateEvent(Guid id, [FromBody] UpdateEventDto dto)
+    public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventDto dto)
     {
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        var updatedEvent = _eventService.UpdateEvent(id, dto.Title, dto.Description, dto.StartAt, dto.EndAt);
+        var updatedEvent = await _eventService.UpdateEventAsync(id, dto.Title, dto.Description, dto.StartAt, dto.EndAt);
         if (updatedEvent is null)
         {
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
@@ -127,9 +127,9 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public IActionResult DeleteEvent(Guid id)
+    public async Task<IActionResult> DeleteEvent(Guid id)
     {
-        var deleted = _eventService.DeleteEvent(id);
+        var deleted = await _eventService.DeleteEventAsync(id);
         if (!deleted)
         {
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));

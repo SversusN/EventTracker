@@ -14,8 +14,30 @@ REST API сервис для управления мероприятиями и 
 ## Требования
 
 - .NET 10 SDK
+- PostgreSQL (для хранения данных)
 
 ## Запуск проекта
+
+### Настройка базы данных
+
+По умолчанию приложение подключается к PostgreSQL на `localhost:5432` с параметрами:
+- Database: `eventapi`
+- Username: `postgres`
+- Password: `postgres`
+
+Строка подключения настраивается в `appsettings.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=postgres"
+  }
+}
+```
+
+Схема базы данных (таблицы `events` и `bookings`) создаётся автоматически при первом запуске приложения через `EnsureCreated`.
+
+### Запуск
 
 ```bash
 dotnet build
@@ -183,53 +205,48 @@ GET /bookings/{id}
 
 ## Примитивы синхронизации
 
-В проекте используются два примитива синхронизации для защиты критических секций при конкурентных запросах:
+### `SemaphoreSlim` в `BookingService`
 
-### `lock` в `BookingService`
-
-В `BookingService.CreateBookingAsync` вся логика атомарной операции «проверка доступных мест + резервирование мест + создание брони» обёрнута в `lock`:
+В `BookingService.CreateBookingAsync` используется `SemaphoreSlim` для защиты критической секции при асинхронных операциях с базой данных:
 
 ```csharp
-private readonly object _bookingLock = new();
+private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-lock (_bookingLock)
+await BookingLock.WaitAsync();
+try
 {
-    var eventItem = eventService.GetEventById(eventId);
+    var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
     if (!eventItem.TryReserveSeats())
     {
         throw new NoAvailableSeatsException("No available seats for this event");
     }
     var booking = new Booking(eventId);
-    _bookings.TryAdd(booking.Id, booking);
+    _context.Bookings.Add(booking);
+    await _context.SaveChangesAsync();
+}
+finally
+{
+    BookingLock.Release();
 }
 ```
 
-Это гарантирует, что в любой момент времени только один поток может проверять и изменять количество доступных мест, полностью исключая овербукинг.
-
-### `SemaphoreSlim` в `BookingProcessingService`
-
-В фоновом сервисе `BookingProcessingService` используется `SemaphoreSlim(1, 1)` для потокобезопасной записи в хранилище броней при параллельной обработке:
-
-```csharp
-private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
-```
-
-Все pending-брони обрабатываются параллельно через `Task.WhenAll`, но перед изменением статуса брони и сохранением в хранилище захватывается семафор. Искусственная задержка (имитация внешнего вызова) выполняется до захвата семафора, что позволяет задержкам выполняться параллельно.
-
-`SemaphoreSlim` выбран вместо `lock`, потому что `lock` нельзя использовать с `await` внутри заблокированного блока.
+`SemaphoreSlim` выбран вместо `lock`, потому что внутри критической секции используются `await`-вызовы к базе данных, а `lock` не поддерживает асинхронные операции.
 
 ## Фоновая обработка бронирований
 
 При создании брони через `POST /events/{id}/book` она создаётся в статусе `Pending`. Фоновый сервис `BookingProcessingService` периодически проверяет наличие броней в этом статусе и обрабатывает их параллельно:
 
-1. Для каждой брони в статусе `Pending` выполняется искусственная задержка (2 секунды), имитирующая обращение к внешней системе
-2. Задержки всех броней выполняются параллельно
-3. Перед изменением статуса захватывается `SemaphoreSlim` для потокобезопасности
-4. Если событие было удалено к моменту обработки — бронь отклоняется (`Rejected`)
-5. При непредвиденной ошибке бронь отклоняется, а место возвращается в пул через `ReleaseSeats()`
-6. При успехе бронь переводится в статус `Confirmed`, заполняется поле `ProcessedAt`
+1. Для получения списка pending-броней создаётся отдельный `IServiceScope` с `AppDbContext`
+2. Для обработки каждой брони создаётся свой `IServiceScope` и свой `AppDbContext`
+3. Для каждой брони выполняется искусственная задержка (2 секунды), имитирующая обращение к внешней системе
+4. Задержки всех броней выполняются параллельно
+5. Если событие было удалено к моменту обработки — бронь отклоняется (`Rejected`)
+6. При непредвиденной ошибке бронь отклоняется, а место возвращается в пул через `ReleaseSeats()`
+7. При успехе бронь переводится в статус `Confirmed`, заполняется поле `ProcessedAt`
 
 Интервал проверки: 5 секунд.
+
+Использование отдельных scope для каждой брони необходимо, потому что `BackgroundService` — синглтон, а `DbContext` — scoped зависимость.
 
 ### Пример сценария использования
 
@@ -261,7 +278,7 @@ curl https://localhost:5001/bookings/{booking-id}
 - Остальные 15 запросов получают `409 Conflict`
 - `availableSeats` корректно уменьшается до 0
 
-Это поведение покрыто юнит-тестами на конкурентность.
+Это поведение покрыто юнит-тестами на конкурентность с использованием InMemory базы данных EF Core.
 
 ## Обработка ошибок
 
@@ -401,7 +418,7 @@ POST /events/550e8400-e29b-41d4-a716-446655440000/book
 
 ## Тестирование
 
-Проект покрыт юнит-тестами с использованием xUnit и Moq.
+Проект покрыт юнит-тестами с использованием xUnit. Для интеграционного тестирования сервисов используется InMemory-провайдер Entity Framework Core. Для тестирования контроллеров используется Moq.
 
 Запуск всех тестов:
 ```bash
@@ -444,8 +461,6 @@ dotnet test --verbosity normal
 - Получение брони по ID
 - Смена статуса брони (`Confirm` / `Reject`)
 - `ReleaseSeats` восстанавливает доступные места
-- Получение броней по статусу
-- Обновление существующей брони
 - Брони для разных событий создаются корректно
 - **Конкурентные тесты:**
   - Защита от овербукинга (5 мест, 20 запросов — ровно 5 успешных)

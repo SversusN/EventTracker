@@ -1,25 +1,28 @@
-using System.Collections.Concurrent;
+using EventTrackerApi.DataAccess;
 using EventTrackerApi.Exceptions;
 using EventTrackerApi.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventTrackerApi.Services;
 
 /// <summary>
-/// Сервис для работы с бронированиями (in-memory хранилище)
+/// Сервис для работы с бронированиями
 /// </summary>
-public class BookingService(IEventService eventService, ILogger<BookingService> logger) : IBookingService
+public class BookingService(AppDbContext context, ILogger<BookingService> logger) : IBookingService
 {
-    private readonly ConcurrentDictionary<Guid, Booking> _bookings = new();
-    private readonly Lock _bookingLock = new();
+    private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-    public Task<Booking> CreateBookingAsync(Guid eventId)
+    private readonly AppDbContext _context = context;
+
+    public async Task<Booking> CreateBookingAsync(Guid eventId)
     {
         logger.LogInformation("Creating booking for event {EventId}", eventId);
 
-        lock (_bookingLock)
+        await BookingLock.WaitAsync();
+        try
         {
             // Проверяем существование события
-            var eventItem = eventService.GetEventById(eventId);
+            var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
             if (eventItem is null)
             {
                 logger.LogWarning("Cannot create booking: event {EventId} not found", eventId);
@@ -35,51 +38,31 @@ public class BookingService(IEventService eventService, ILogger<BookingService> 
 
             // Создаём бронь в статусе Pending
             var booking = new Booking(eventId);
-            _bookings.TryAdd(booking.Id, booking);
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
 
             logger.LogInformation("Created booking {BookingId} for event {EventId} with status {Status}. Available seats left: {AvailableSeats}",
                 booking.Id, eventId, booking.Status, eventItem.AvailableSeats);
 
-            return Task.FromResult(booking);
+            return booking;
+        }
+        finally
+        {
+            BookingLock.Release();
         }
     }
 
-    public Task<Booking?> GetBookingByIdAsync(Guid bookingId)
+    public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
     {
         logger.LogInformation("Getting booking by id: {BookingId}", bookingId);
 
-        if (!_bookings.TryGetValue(bookingId, out var booking))
+        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId);
+        if (booking is null)
         {
             logger.LogWarning("Booking with id {BookingId} not found", bookingId);
-            return Task.FromResult<Booking?>(null);
+            return null;
         }
 
-        return Task.FromResult<Booking?>(booking);
-    }
-
-    public Task<IEnumerable<Booking>> GetBookingsByStatusAsync(BookingStatus status)
-    {
-        logger.LogInformation("Getting bookings by status: {Status}", status);
-
-        var bookings = _bookings.Values
-            .Where(b => b.Status == status)
-            .ToList();
-
-        return Task.FromResult<IEnumerable<Booking>>(bookings);
-    }
-
-    public Task<bool> UpdateBookingAsync(Booking booking)
-    {
-        logger.LogInformation("Updating booking {BookingId} with status {Status}",
-            booking.Id, booking.Status);
-
-        if (!_bookings.ContainsKey(booking.Id))
-        {
-            logger.LogWarning("Cannot update booking {BookingId}: not found", booking.Id);
-            return Task.FromResult(false);
-        }
-
-        _bookings[booking.Id] = booking;
-        return Task.FromResult(true);
+        return booking;
     }
 }

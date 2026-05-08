@@ -1,25 +1,41 @@
+using EventTrackerApi.DataAccess;
 using EventTrackerApi.Models;
 using EventTrackerApi.Services;
-using Microsoft.Extensions.Logging;
-using Moq;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventTrackerApi.Tests;
 
-public class EventServiceTests
+public class EventServiceTests : IDisposable
 {
+    private readonly ServiceProvider _serviceProvider;
+    private readonly IServiceScope _scope;
     private readonly EventService _eventService;
-    private readonly Mock<ILogger<EventService>> _loggerMock;
 
     public EventServiceTests()
     {
-        _loggerMock = new Mock<ILogger<EventService>>();
-        _eventService = new EventService(_loggerMock.Object);
+        var dbName = Guid.NewGuid().ToString();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase(dbName));
+        services.AddScoped<IEventService, EventService>();
+
+        _serviceProvider = services.BuildServiceProvider();
+        _scope = _serviceProvider.CreateScope();
+        _eventService = (EventService)_scope.ServiceProvider.GetRequiredService<IEventService>();
+    }
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+        _serviceProvider.Dispose();
     }
 
     #region Создание события
 
     [Fact]
-    public void CreateEvent_WithValidData_ReturnsCreatedEvent()
+    public async Task CreateEventAsync_WithValidData_ReturnsCreatedEvent()
     {
         // Arrange
         var title = "Test Event";
@@ -29,7 +45,7 @@ public class EventServiceTests
         var totalSeats = 100;
 
         // Act
-        var result = _eventService.CreateEvent(title, description, startAt, endAt, totalSeats);
+        var result = await _eventService.CreateEventAsync(title, description, startAt, endAt, totalSeats);
 
         // Assert
         Assert.NotNull(result);
@@ -47,15 +63,15 @@ public class EventServiceTests
     [InlineData("Title", "Description", "2026-01-05", "2026-01-01", 10)]
     [InlineData("Title", "Description", "2026-01-01", "2026-01-02", 0)]
     [InlineData("Title", "Description", "2026-01-01", "2026-01-02", -1)]
-    public void CreateEvent_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr, int totalSeats)
+    public async Task CreateEventAsync_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr, int totalSeats)
     {
         // Arrange
         var startAt = DateTime.Parse(startAtStr);
         var endAt = DateTime.Parse(endAtStr);
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
-            _eventService.CreateEvent(title, description, startAt, endAt, totalSeats));
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _eventService.CreateEventAsync(title, description, startAt, endAt, totalSeats));
     }
 
     #endregion
@@ -63,10 +79,10 @@ public class EventServiceTests
     #region Получение всех событий
 
     [Fact]
-    public void GetEvents_WithNoEvents_ReturnsEmptyPaginatedResult()
+    public async Task GetEventsAsync_WithNoEvents_ReturnsEmptyPaginatedResult()
     {
         // Act
-        var result = _eventService.GetEvents();
+        var result = await _eventService.GetEventsAsync();
 
         // Assert
         Assert.NotNull(result);
@@ -77,15 +93,15 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithMultipleEvents_ReturnsAllEvents()
+    public async Task GetEventsAsync_WithMultipleEvents_ReturnsAllEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Event 3", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 3", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents();
+        var result = await _eventService.GetEventsAsync();
 
         // Assert
         Assert.Equal(3, result.TotalCount);
@@ -97,13 +113,13 @@ public class EventServiceTests
     #region Получение события по ID
 
     [Fact]
-    public void GetEventById_WithExistingId_ReturnsEvent()
+    public async Task GetEventByIdAsync_WithExistingId_ReturnsEvent()
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Test", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        var createdEvent = await _eventService.CreateEventAsync("Test", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEventById(createdEvent.Id);
+        var result = await _eventService.GetEventByIdAsync(createdEvent.Id);
 
         // Assert
         Assert.NotNull(result);
@@ -112,10 +128,10 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEventById_WithNonExistingId_ReturnsNull()
+    public async Task GetEventByIdAsync_WithNonExistingId_ReturnsNull()
     {
         // Act
-        var result = _eventService.GetEventById(Guid.NewGuid());
+        var result = await _eventService.GetEventByIdAsync(Guid.NewGuid());
 
         // Assert
         Assert.Null(result);
@@ -126,17 +142,17 @@ public class EventServiceTests
     #region Обновление события
 
     [Fact]
-    public void UpdateEvent_WithExistingId_ReturnsUpdatedEvent()
+    public async Task UpdateEventAsync_WithExistingId_ReturnsUpdatedEvent()
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Original", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        var createdEvent = await _eventService.CreateEventAsync("Original", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         var newTitle = "Updated Title";
         var newDescription = "Updated Description";
         var newStartAt = DateTime.Now.AddDays(1);
         var newEndAt = DateTime.Now.AddDays(1).AddHours(1);
 
         // Act
-        var result = _eventService.UpdateEvent(createdEvent.Id, newTitle, newDescription, newStartAt, newEndAt);
+        var result = await _eventService.UpdateEventAsync(createdEvent.Id, newTitle, newDescription, newStartAt, newEndAt);
 
         // Assert
         Assert.NotNull(result);
@@ -149,10 +165,10 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void UpdateEvent_WithNonExistingId_ReturnsNull()
+    public async Task UpdateEventAsync_WithNonExistingId_ReturnsNull()
     {
         // Act
-        var result = _eventService.UpdateEvent(Guid.NewGuid(), "Title", null, DateTime.Now, DateTime.Now.AddHours(1));
+        var result = await _eventService.UpdateEventAsync(Guid.NewGuid(), "Title", null, DateTime.Now, DateTime.Now.AddHours(1));
 
         // Assert
         Assert.Null(result);
@@ -161,16 +177,16 @@ public class EventServiceTests
     [Theory]
     [InlineData("", "Description", "2026-01-01", "2026-01-02")]
     [InlineData("Title", "Description", "2026-01-05", "2026-01-01")]
-    public void UpdateEvent_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr)
+    public async Task UpdateEventAsync_WithInvalidData_ThrowsArgumentException(string title, string? description, string startAtStr, string endAtStr)
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Original", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        var createdEvent = await _eventService.CreateEventAsync("Original", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         var startAt = DateTime.Parse(startAtStr);
         var endAt = DateTime.Parse(endAtStr);
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
-            _eventService.UpdateEvent(createdEvent.Id, title, description, startAt, endAt));
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _eventService.UpdateEventAsync(createdEvent.Id, title, description, startAt, endAt));
     }
 
     #endregion
@@ -178,24 +194,24 @@ public class EventServiceTests
     #region Удаление события
 
     [Fact]
-    public void DeleteEvent_WithExistingId_ReturnsTrue()
+    public async Task DeleteEventAsync_WithExistingId_ReturnsTrue()
     {
         // Arrange
-        var createdEvent = _eventService.CreateEvent("Test", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        var createdEvent = await _eventService.CreateEventAsync("Test", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.DeleteEvent(createdEvent.Id);
+        var result = await _eventService.DeleteEventAsync(createdEvent.Id);
 
         // Assert
         Assert.True(result);
-        Assert.Null(_eventService.GetEventById(createdEvent.Id));
+        Assert.Null(await _eventService.GetEventByIdAsync(createdEvent.Id));
     }
 
     [Fact]
-    public void DeleteEvent_WithNonExistingId_ReturnsFalse()
+    public async Task DeleteEventAsync_WithNonExistingId_ReturnsFalse()
     {
         // Act
-        var result = _eventService.DeleteEvent(Guid.NewGuid());
+        var result = await _eventService.DeleteEventAsync(Guid.NewGuid());
 
         // Assert
         Assert.False(result);
@@ -206,15 +222,15 @@ public class EventServiceTests
     #region Фильтрация по названию
 
     [Fact]
-    public void GetEvents_WithTitleFilter_ReturnsMatchingEvents()
+    public async Task GetEventsAsync_WithTitleFilter_ReturnsMatchingEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Team Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Team Project", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Lunch", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Team Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Team Project", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Lunch", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(title: "Team");
+        var result = await _eventService.GetEventsAsync(title: "Team");
 
         // Assert
         Assert.Equal(2, result.TotalCount);
@@ -222,40 +238,40 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithTitleFilter_CaseInsensitive()
+    public async Task GetEventsAsync_WithTitleFilter_CaseInsensitive()
     {
         // Arrange
-        _eventService.CreateEvent("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(title: "meeting");
+        var result = await _eventService.GetEventsAsync(title: "meeting");
 
         // Assert
         Assert.Equal(1, result.TotalCount);
     }
 
     [Fact]
-    public void GetEvents_WithTitleFilter_PartialMatch()
+    public async Task GetEventsAsync_WithTitleFilter_PartialMatch()
     {
         // Arrange
-        _eventService.CreateEvent("Team Meeting Today", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Team Meeting Today", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(title: "Meet");
+        var result = await _eventService.GetEventsAsync(title: "Meet");
 
         // Assert
         Assert.Equal(1, result.TotalCount);
     }
 
     [Fact]
-    public void GetEvents_WithEmptyTitleFilter_ReturnsAllEvents()
+    public async Task GetEventsAsync_WithEmptyTitleFilter_ReturnsAllEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(title: "");
+        var result = await _eventService.GetEventsAsync(title: "");
 
         // Assert
         Assert.Equal(2, result.TotalCount);
@@ -266,15 +282,15 @@ public class EventServiceTests
     #region Фильтрация по датам
 
     [Fact]
-    public void GetEvents_WithFromDateFilter_ReturnsEventsStartingAfter()
+    public async Task GetEventsAsync_WithFromDateFilter_ReturnsEventsStartingAfter()
     {
         // Arrange
         var baseDate = new DateTime(2026, 1, 1);
-        _eventService.CreateEvent("Past", null, baseDate.AddDays(-1), baseDate.AddDays(-1).AddHours(1), 10);
-        _eventService.CreateEvent("Future", null, baseDate.AddDays(1), baseDate.AddDays(1).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Past", null, baseDate.AddDays(-1), baseDate.AddDays(-1).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Future", null, baseDate.AddDays(1), baseDate.AddDays(1).AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(from: baseDate);
+        var result = await _eventService.GetEventsAsync(from: baseDate);
 
         // Assert
         Assert.Single(result.Items);
@@ -282,15 +298,15 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithToDateFilter_ReturnsEventsEndingBefore()
+    public async Task GetEventsAsync_WithToDateFilter_ReturnsEventsEndingBefore()
     {
         // Arrange
         var baseDate = new DateTime(2026, 1, 15);
-        _eventService.CreateEvent("Early", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1), 10);
-        _eventService.CreateEvent("Late", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Early", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Late", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(to: baseDate);
+        var result = await _eventService.GetEventsAsync(to: baseDate);
 
         // Assert
         Assert.Single(result.Items);
@@ -298,18 +314,18 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithDateRangeFilter_ReturnsEventsInRange()
+    public async Task GetEventsAsync_WithDateRangeFilter_ReturnsEventsInRange()
     {
         // Arrange
         var fromDate = new DateTime(2026, 1, 1);
         var toDate = new DateTime(2026, 1, 31);
         
-        _eventService.CreateEvent("Before", null, fromDate.AddDays(-5), fromDate.AddDays(-5).AddHours(1), 10);
-        _eventService.CreateEvent("In Range", null, fromDate.AddDays(10), fromDate.AddDays(10).AddHours(1), 10);
-        _eventService.CreateEvent("After", null, toDate.AddDays(5), toDate.AddDays(5).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Before", null, fromDate.AddDays(-5), fromDate.AddDays(-5).AddHours(1), 10);
+        await _eventService.CreateEventAsync("In Range", null, fromDate.AddDays(10), fromDate.AddDays(10).AddHours(1), 10);
+        await _eventService.CreateEventAsync("After", null, toDate.AddDays(5), toDate.AddDays(5).AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(from: fromDate, to: toDate);
+        var result = await _eventService.GetEventsAsync(from: fromDate, to: toDate);
 
         // Assert
         Assert.Single(result.Items);
@@ -321,16 +337,16 @@ public class EventServiceTests
     #region Пагинация
 
     [Fact]
-    public void GetEvents_WithPagination_ReturnsCorrectPage()
+    public async Task GetEventsAsync_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
         for (int i = 1; i <= 25; i++)
         {
-            _eventService.CreateEvent($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+            await _eventService.CreateEventAsync($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         }
 
         // Act
-        var result = _eventService.GetEvents(page: 2, pageSize: 10);
+        var result = await _eventService.GetEventsAsync(page: 2, pageSize: 10);
 
         // Assert
         Assert.Equal(25, result.TotalCount);
@@ -340,29 +356,29 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithLastPage_ReturnsRemainingItems()
+    public async Task GetEventsAsync_WithLastPage_ReturnsRemainingItems()
     {
         // Arrange
         for (int i = 1; i <= 25; i++)
         {
-            _eventService.CreateEvent($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+            await _eventService.CreateEventAsync($"Event {i}", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         }
 
         // Act
-        var result = _eventService.GetEvents(page: 3, pageSize: 10);
+        var result = await _eventService.GetEventsAsync(page: 3, pageSize: 10);
 
         // Assert
         Assert.Equal(5, result.Items.Count()); // Оставшиеся 5 элементов
     }
 
     [Fact]
-    public void GetEvents_WithPageBeyondRange_ReturnsEmptyList()
+    public async Task GetEventsAsync_WithPageBeyondRange_ReturnsEmptyList()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(page: 10, pageSize: 10);
+        var result = await _eventService.GetEventsAsync(page: 10, pageSize: 10);
 
         // Assert
         Assert.Empty(result.Items);
@@ -373,18 +389,18 @@ public class EventServiceTests
     #region Комбинированная фильтрация
 
     [Fact]
-    public void GetEvents_WithCombinedFilters_ReturnsMatchingEvents()
+    public async Task GetEventsAsync_WithCombinedFilters_ReturnsMatchingEvents()
     {
         // Arrange
         var baseDate = new DateTime(2026, 6, 1);
         
-        _eventService.CreateEvent("Meeting", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10);
-        _eventService.CreateEvent("Client Meeting", null, baseDate.AddDays(10), baseDate.AddDays(10).AddHours(1), 10);
-        _eventService.CreateEvent("Lunch", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1), 10); // До from
-        _eventService.CreateEvent("Review", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10); // Не содержит "Meeting"
+        await _eventService.CreateEventAsync("Meeting", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Client Meeting", null, baseDate.AddDays(10), baseDate.AddDays(10).AddHours(1), 10);
+        await _eventService.CreateEventAsync("Lunch", null, baseDate.AddDays(-5), baseDate.AddDays(-5).AddHours(1), 10); // До from
+        await _eventService.CreateEventAsync("Review", null, baseDate.AddDays(5), baseDate.AddDays(5).AddHours(1), 10); // Не содержит "Meeting"
 
         // Act
-        var result = _eventService.GetEvents(
+        var result = await _eventService.GetEventsAsync(
             title: "Meeting",
             from: baseDate,
             to: baseDate.AddDays(15)
@@ -400,28 +416,28 @@ public class EventServiceTests
     #region Edge cases фильтрации
 
     [Fact]
-    public void GetEvents_WithWhitespaceTitleFilter_ReturnsAllEvents()
+    public async Task GetEventsAsync_WithWhitespaceTitleFilter_ReturnsAllEvents()
     {
         // Arrange
-        _eventService.CreateEvent("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 1", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event 2", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(title: "   ");
+        var result = await _eventService.GetEventsAsync(title: "   ");
 
         // Assert
         Assert.Equal(2, result.TotalCount);
     }
 
     [Fact]
-    public void GetEvents_WithNonMatchingTitleFilter_ReturnsEmptyResult()
+    public async Task GetEventsAsync_WithNonMatchingTitleFilter_ReturnsEmptyResult()
     {
         // Arrange
-        _eventService.CreateEvent("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
-        _eventService.CreateEvent("Project", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Meeting", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Project", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
 
         // Act
-        var result = _eventService.GetEvents(title: "NonExistent");
+        var result = await _eventService.GetEventsAsync(title: "NonExistent");
 
         // Assert
         Assert.Equal(0, result.TotalCount);
@@ -429,14 +445,14 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithFromGreaterThanTo_ReturnsEmptyResult()
+    public async Task GetEventsAsync_WithFromGreaterThanTo_ReturnsEmptyResult()
     {
         // Arrange
         var baseDate = new DateTime(2026, 1, 15);
-        _eventService.CreateEvent("Event", null, baseDate, baseDate.AddHours(1), 10);
+        await _eventService.CreateEventAsync("Event", null, baseDate, baseDate.AddHours(1), 10);
 
         // Act - from позже to, такой фильтр логически невозможен
-        var result = _eventService.GetEvents(
+        var result = await _eventService.GetEventsAsync(
             from: baseDate.AddDays(10), 
             to: baseDate.AddDays(-10)
         );
@@ -447,16 +463,16 @@ public class EventServiceTests
     }
 
     [Fact]
-    public void GetEvents_WithBoundaryDates_ReturnsCorrectEvents()
+    public async Task GetEventsAsync_WithBoundaryDates_ReturnsCorrectEvents()
     {
         // Arrange
         var exactDate = new DateTime(2026, 6, 15, 10, 0, 0);
-        _eventService.CreateEvent("Exact Start", null, exactDate, exactDate.AddHours(2), 10);
-        _eventService.CreateEvent("Exact End", null, exactDate.AddHours(-2), exactDate, 10);
+        await _eventService.CreateEventAsync("Exact Start", null, exactDate, exactDate.AddHours(2), 10);
+        await _eventService.CreateEventAsync("Exact End", null, exactDate.AddHours(-2), exactDate, 10);
 
         // Act - фильтр включает граничные значения
-        var resultFrom = _eventService.GetEvents(from: exactDate);
-        var resultTo = _eventService.GetEvents(to: exactDate);
+        var resultFrom = await _eventService.GetEventsAsync(from: exactDate);
+        var resultTo = await _eventService.GetEventsAsync(to: exactDate);
 
         // Assert
         Assert.Single(resultFrom.Items);

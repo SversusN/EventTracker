@@ -29,10 +29,10 @@ public class EventsControllerTests
     [InlineData(-1, 10)]
     [InlineData(1, 0)]
     [InlineData(1, -5)]
-    public void GetEvents_WithInvalidPagination_ReturnsBadRequest(int page, int pageSize)
+    public async Task GetEvents_WithInvalidPagination_ReturnsBadRequest(int page, int pageSize)
     {
         // Act
-        var result = _controller.GetEvents(page: page, pageSize: pageSize);
+        var result = await _controller.GetEvents(page: page, pageSize: pageSize);
 
         // Assert
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
@@ -41,7 +41,7 @@ public class EventsControllerTests
     }
 
     [Fact]
-    public void GetEvents_WithDefaultParameters_ReturnsPaginatedResult()
+    public async Task GetEvents_WithDefaultParameters_ReturnsPaginatedResult()
     {
         // Arrange
         var events = new List<Event>
@@ -59,11 +59,11 @@ public class EventsControllerTests
         };
 
         _eventServiceMock
-            .Setup(s => s.GetEvents(null, null, null, 1, 10))
-            .Returns(paginatedResult);
+            .Setup(s => s.GetEventsAsync(null, null, null, 1, 10))
+            .ReturnsAsync(paginatedResult);
 
         // Act
-        var result = _controller.GetEvents();
+        var result = await _controller.GetEvents();
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -71,11 +71,11 @@ public class EventsControllerTests
         Assert.Equal(2, response.TotalCount);
         Assert.Equal(2, response.Items.Count());
         
-        _eventServiceMock.Verify(s => s.GetEvents(null, null, null, 1, 10), Times.Once);
+        _eventServiceMock.Verify(s => s.GetEventsAsync(null, null, null, 1, 10), Times.Once);
     }
 
     [Fact]
-    public void GetEvents_WithTitleFilter_ReturnsFilteredEvents()
+    public async Task GetEvents_WithTitleFilter_ReturnsFilteredEvents()
     {
         // Arrange
         var titleFilter = "Meeting";
@@ -93,22 +93,22 @@ public class EventsControllerTests
         };
 
         _eventServiceMock
-            .Setup(s => s.GetEvents(titleFilter, null, null, 1, 10))
-            .Returns(paginatedResult);
+            .Setup(s => s.GetEventsAsync(titleFilter, null, null, 1, 10))
+            .ReturnsAsync(paginatedResult);
 
         // Act
-        var result = _controller.GetEvents(title: titleFilter);
+        var result = await _controller.GetEvents(title: titleFilter);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<PaginatedResult<EventResponseDto>>(okResult.Value);
         Assert.Single(response.Items);
         
-        _eventServiceMock.Verify(s => s.GetEvents(titleFilter, null, null, 1, 10), Times.Once);
+        _eventServiceMock.Verify(s => s.GetEventsAsync(titleFilter, null, null, 1, 10), Times.Once);
     }
 
     [Fact]
-    public void GetEvents_WithDateFilters_ReturnsFilteredEvents()
+    public async Task GetEvents_WithDateFilters_ReturnsFilteredEvents()
     {
         // Arrange
         var fromDate = new DateTime(2024, 1, 1);
@@ -127,21 +127,21 @@ public class EventsControllerTests
         };
 
         _eventServiceMock
-            .Setup(s => s.GetEvents(null, fromDate, toDate, 1, 10))
-            .Returns(paginatedResult);
+            .Setup(s => s.GetEventsAsync(null, fromDate, toDate, 1, 10))
+            .ReturnsAsync(paginatedResult);
 
         // Act
-        var result = _controller.GetEvents(from: fromDate, to: toDate);
+        var result = await _controller.GetEvents(from: fromDate, to: toDate);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.IsType<PaginatedResult<EventResponseDto>>(okResult.Value);
         
-        _eventServiceMock.Verify(s => s.GetEvents(null, fromDate, toDate, 1, 10), Times.Once);
+        _eventServiceMock.Verify(s => s.GetEventsAsync(null, fromDate, toDate, 1, 10), Times.Once);
     }
 
     [Fact]
-    public void GetEvents_WithPagination_ReturnsCorrectPage()
+    public async Task GetEvents_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
         var page = 2;
@@ -160,11 +160,11 @@ public class EventsControllerTests
         };
 
         _eventServiceMock
-            .Setup(s => s.GetEvents(null, null, null, page, pageSize))
-            .Returns(paginatedResult);
+            .Setup(s => s.GetEventsAsync(null, null, null, page, pageSize))
+            .ReturnsAsync(paginatedResult);
 
         // Act
-        var result = _controller.GetEvents(page: page, pageSize: pageSize);
+        var result = await _controller.GetEvents(page: page, pageSize: pageSize);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -175,7 +175,7 @@ public class EventsControllerTests
     }
 
     [Fact]
-    public void GetEvents_WithCombinedFilters_ReturnsFilteredPaginatedEvents()
+    public async Task GetEvents_WithCombinedFilters_ReturnsFilteredPaginatedEvents()
     {
         // Arrange
         var title = "Meeting";
@@ -198,18 +198,18 @@ public class EventsControllerTests
         };
 
         _eventServiceMock
-            .Setup(s => s.GetEvents(title, fromDate, toDate, page, pageSize))
-            .Returns(paginatedResult);
+            .Setup(s => s.GetEventsAsync(title, fromDate, toDate, page, pageSize))
+            .ReturnsAsync(paginatedResult);
 
         // Act
-        var result = _controller.GetEvents(title, fromDate, toDate, page, pageSize);
+        var result = await _controller.GetEvents(title, fromDate, toDate, page, pageSize);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<PaginatedResult<EventResponseDto>>(okResult.Value);
         Assert.Single(response.Items);
         
-        _eventServiceMock.Verify(s => s.GetEvents(title, fromDate, toDate, page, pageSize), Times.Once);
+        _eventServiceMock.Verify(s => s.GetEventsAsync(title, fromDate, toDate, page, pageSize), Times.Once);
     }
 
     #endregion
@@ -217,46 +217,46 @@ public class EventsControllerTests
     #region GET /events/{id} - Получение по ID
 
     [Fact]
-    public void GetEventById_WithExistingId_ReturnsOk()
+    public async Task GetEventById_WithExistingId_ReturnsOk()
     {
         // Arrange
         var eventId = Guid.NewGuid();
         var ev = new Event("Test Event", null, DateTime.Now, DateTime.Now.AddHours(1), 10);
         
         _eventServiceMock
-            .Setup(s => s.GetEventById(eventId))
-            .Returns(ev);
+            .Setup(s => s.GetEventByIdAsync(eventId))
+            .ReturnsAsync(ev);
 
         // Act
-        var result = _controller.GetEventById(eventId);
+        var result = await _controller.GetEventById(eventId);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<EventResponseDto>(okResult.Value);
         Assert.Equal(ev.Title, response.Title);
         
-        _eventServiceMock.Verify(s => s.GetEventById(eventId), Times.Once);
+        _eventServiceMock.Verify(s => s.GetEventByIdAsync(eventId), Times.Once);
     }
 
     [Fact]
-    public void GetEventById_WithNonExistingId_ReturnsNotFound()
+    public async Task GetEventById_WithNonExistingId_ReturnsNotFound()
     {
         // Arrange
         var eventId = Guid.NewGuid();
         
         _eventServiceMock
-            .Setup(s => s.GetEventById(eventId))
-            .Returns((Event?)null);
+            .Setup(s => s.GetEventByIdAsync(eventId))
+            .ReturnsAsync((Event?)null);
 
         // Act
-        var result = _controller.GetEventById(eventId);
+        var result = await _controller.GetEventById(eventId);
 
         // Assert
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         var problemDetails = Assert.IsType<ProblemDetails>(notFoundResult.Value);
         Assert.Equal(404, problemDetails.Status);
         
-        _eventServiceMock.Verify(s => s.GetEventById(eventId), Times.Once);
+        _eventServiceMock.Verify(s => s.GetEventByIdAsync(eventId), Times.Once);
     }
 
     #endregion
@@ -264,7 +264,7 @@ public class EventsControllerTests
     #region POST /events - Создание
 
     [Fact]
-    public void CreateEvent_WithValidData_ReturnsCreatedAtAction()
+    public async Task CreateEvent_WithValidData_ReturnsCreatedAtAction()
     {
         // Arrange
         var dto = new CreateEventDto(
@@ -278,18 +278,18 @@ public class EventsControllerTests
         var createdEvent = new Event(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats);
         
         _eventServiceMock
-            .Setup(s => s.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats))
-            .Returns(createdEvent);
+            .Setup(s => s.CreateEventAsync(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats))
+            .ReturnsAsync(createdEvent);
 
         // Act
-        var result = _controller.CreateEvent(dto);
+        var result = await _controller.CreateEvent(dto);
 
         // Assert
         var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Equal(nameof(EventsController.GetEventById), createdAtActionResult.ActionName);
         Assert.Equal(createdEvent.Id, ((EventResponseDto)createdAtActionResult.Value!).Id);
         
-        _eventServiceMock.Verify(s => s.CreateEvent(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats), Times.Once);
+        _eventServiceMock.Verify(s => s.CreateEventAsync(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats), Times.Once);
     }
 
     #endregion
@@ -297,7 +297,7 @@ public class EventsControllerTests
     #region PUT /events/{id} - Обновление
 
     [Fact]
-    public void UpdateEvent_WithExistingId_ReturnsOk()
+    public async Task UpdateEvent_WithExistingId_ReturnsOk()
     {
         // Arrange
         var eventId = Guid.NewGuid();
@@ -311,22 +311,22 @@ public class EventsControllerTests
         var updatedEvent = new Event(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt, 100, 100);
         
         _eventServiceMock
-            .Setup(s => s.UpdateEvent(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt))
-            .Returns(updatedEvent);
+            .Setup(s => s.UpdateEventAsync(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt))
+            .ReturnsAsync(updatedEvent);
 
         // Act
-        var result = _controller.UpdateEvent(eventId, dto);
+        var result = await _controller.UpdateEvent(eventId, dto);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<EventResponseDto>(okResult.Value);
         Assert.Equal(dto.Title, response.Title);
         
-        _eventServiceMock.Verify(s => s.UpdateEvent(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt), Times.Once);
+        _eventServiceMock.Verify(s => s.UpdateEventAsync(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt), Times.Once);
     }
 
     [Fact]
-    public void UpdateEvent_WithNonExistingId_ReturnsNotFound()
+    public async Task UpdateEvent_WithNonExistingId_ReturnsNotFound()
     {
         // Arrange
         var eventId = Guid.NewGuid();
@@ -338,18 +338,18 @@ public class EventsControllerTests
         );
         
         _eventServiceMock
-            .Setup(s => s.UpdateEvent(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt))
-            .Returns((Event?)null);
+            .Setup(s => s.UpdateEventAsync(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt))
+            .ReturnsAsync((Event?)null);
 
         // Act
-        var result = _controller.UpdateEvent(eventId, dto);
+        var result = await _controller.UpdateEvent(eventId, dto);
 
         // Assert
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         var problemDetails = Assert.IsType<ProblemDetails>(notFoundResult.Value);
         Assert.Equal(404, problemDetails.Status);
         
-        _eventServiceMock.Verify(s => s.UpdateEvent(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt), Times.Once);
+        _eventServiceMock.Verify(s => s.UpdateEventAsync(eventId, dto.Title, dto.Description, dto.StartAt, dto.EndAt), Times.Once);
     }
 
     #endregion
@@ -357,43 +357,43 @@ public class EventsControllerTests
     #region DELETE /events/{id} - Удаление
 
     [Fact]
-    public void DeleteEvent_WithExistingId_ReturnsNoContent()
+    public async Task DeleteEvent_WithExistingId_ReturnsNoContent()
     {
         // Arrange
         var eventId = Guid.NewGuid();
         
         _eventServiceMock
-            .Setup(s => s.DeleteEvent(eventId))
-            .Returns(true);
+            .Setup(s => s.DeleteEventAsync(eventId))
+            .ReturnsAsync(true);
 
         // Act
-        var result = _controller.DeleteEvent(eventId);
+        var result = await _controller.DeleteEvent(eventId);
 
         // Assert
         Assert.IsType<NoContentResult>(result);
         
-        _eventServiceMock.Verify(s => s.DeleteEvent(eventId), Times.Once);
+        _eventServiceMock.Verify(s => s.DeleteEventAsync(eventId), Times.Once);
     }
 
     [Fact]
-    public void DeleteEvent_WithNonExistingId_ReturnsNotFound()
+    public async Task DeleteEvent_WithNonExistingId_ReturnsNotFound()
     {
         // Arrange
         var eventId = Guid.NewGuid();
         
         _eventServiceMock
-            .Setup(s => s.DeleteEvent(eventId))
-            .Returns(false);
+            .Setup(s => s.DeleteEventAsync(eventId))
+            .ReturnsAsync(false);
 
         // Act
-        var result = _controller.DeleteEvent(eventId);
+        var result = await _controller.DeleteEvent(eventId);
 
         // Assert
         var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
         var problemDetails = Assert.IsType<ProblemDetails>(notFoundResult.Value);
         Assert.Equal(404, problemDetails.Status);
         
-        _eventServiceMock.Verify(s => s.DeleteEvent(eventId), Times.Once);
+        _eventServiceMock.Verify(s => s.DeleteEventAsync(eventId), Times.Once);
     }
 
     #endregion

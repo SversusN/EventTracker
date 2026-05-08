@@ -28,3 +28,4 @@ logs/
 
 # HTTP client files
 *.http
+task.md

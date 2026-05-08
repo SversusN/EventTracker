@@ -31,6 +31,13 @@ public class Booking
     public DateTime? ProcessedAt { get; private set; }
 
     /// <summary>
+    /// Событие, к которому относится бронь
+    /// </summary>
+    public Event? Event { get; private set; }
+
+    private Booking() { }
+
+    /// <summary>
     /// Создаёт новую бронь в статусе Pending
     /// </summary>
     public Booking(Guid eventId)

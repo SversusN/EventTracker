@@ -1,6 +1,8 @@
+using EventTrackerApi.DataAccess;
 using EventTrackerApi.Infrastructure;
 using EventTrackerApi.Middleware;
 using EventTrackerApi.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,12 +22,20 @@ builder.Services.AddSwaggerGen (options =>
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "Event Tracker Api", Version = "v1" }); 
 });
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddSingleton<IEventService, EventService>();
-builder.Services.AddSingleton<IBookingService, BookingService>();
+builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddHostedService<BookingProcessingService>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
 
 if (app.Environment.IsDevelopment())
 {
