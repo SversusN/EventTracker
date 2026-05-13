@@ -15,12 +15,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="EventApi_Sprint5\**\*.cs" />
-    <Content Remove="EventApi_Sprint5\**\*" />
-    <None Remove="EventApi_Sprint5\**\*" />
+    <Compile Remove="EventTrackerApi.IntegrationTests\**\*.cs" />
+    <Content Remove="EventTrackerApi.IntegrationTests\**\*" />
+    <None Remove="EventTrackerApi.IntegrationTests\**\*" />
   </ItemGroup>
 
-  <ItemGroup>
+
+ 
+	<ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
