@@ -1,6 +1,5 @@
-using EventTrackerApi.DataAccess;
+using EventTrackerApi.DataAccess.Repositories;
 using EventTrackerApi.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace EventTrackerApi.Services;
 
@@ -26,11 +25,9 @@ public class BookingProcessingService(
 
                 using (var scope = scopeFactory.CreateScope())
                 {
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    pendingBookingIds = await context.Bookings
-                        .Where(b => b.Status == BookingStatus.Pending)
-                        .Select(b => b.Id)
-                        .ToListAsync(stoppingToken);
+                    var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                    var pendingBookings = await bookingRepository.GetPendingAsync();
+                    pendingBookingIds = pendingBookings.Select(b => b.Id).ToList();
                 }
 
                 var tasks = pendingBookingIds.Select(id =>
@@ -69,17 +66,19 @@ public class BookingProcessingService(
             await Task.Delay(ProcessingDelay, stoppingToken);
 
             using var scope = scopeFactory.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+            var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
 
-            var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+            var booking = await bookingRepository.GetByIdAsync(bookingId);
             if (booking == null || booking.Status != BookingStatus.Pending)
                 return;
 
-            var eventItem = await context.Events.FirstOrDefaultAsync(e => e.Id == booking.EventId, stoppingToken);
+            var eventItem = await eventRepository.GetByIdAsync(booking.EventId);
             if (eventItem == null)
             {
                 booking.Reject();
-                await context.SaveChangesAsync(stoppingToken);
+                bookingRepository.Update(booking);
+                await bookingRepository.SaveChangesAsync();
 
                 logger.LogWarning(
                     "Booking {BookingId} rejected: event {EventId} not found",
@@ -89,7 +88,8 @@ public class BookingProcessingService(
             }
 
             booking.Confirm();
-            await context.SaveChangesAsync(stoppingToken);
+            bookingRepository.Update(booking);
+            await bookingRepository.SaveChangesAsync();
 
             logger.LogInformation(
                 "Booking {BookingId} for event {EventId} processed → {Status}",
@@ -104,18 +104,20 @@ public class BookingProcessingService(
             try
             {
                 using var scope = scopeFactory.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
 
-                var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+                var booking = await bookingRepository.GetByIdAsync(bookingId);
                 if (booking != null)
                 {
                     booking.Reject();
+                    bookingRepository.Update(booking);
 
-                    var eventItem = await context.Events.FirstOrDefaultAsync(e => e.Id == booking.EventId, stoppingToken);
+                    var eventItem = await eventRepository.GetByIdAsync(booking.EventId);
                     if (eventItem != null)
                         eventItem.ReleaseSeats();
 
-                    await context.SaveChangesAsync(stoppingToken);
+                    await bookingRepository.SaveChangesAsync();
                 }
 
                 logger.LogError(ex,
