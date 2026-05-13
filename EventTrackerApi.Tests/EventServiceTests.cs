@@ -1,4 +1,5 @@
 using EventTrackerApi.DataAccess;
+using EventTrackerApi.DataAccess.Repositories;
 using EventTrackerApi.Models;
 using EventTrackerApi.Services;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public class EventServiceTests : IDisposable
         services.AddLogging();
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(dbName));
+        services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventService, EventService>();
 
         _serviceProvider = services.BuildServiceProvider();
