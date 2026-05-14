@@ -35,7 +35,19 @@ REST API сервис для управления мероприятиями и 
 }
 ```
 
-Схема базы данных (таблицы `events` и `bookings`) создаётся автоматически при первом запуске приложения через `EnsureCreated`.
+Схема базы данных управляется миграциями EF Core. При запуске приложения автоматически применяются все ожидающие миграции через `Migrate()`. Таблицы `events` и `bookings` создаются миграцией `InitialCreate`, которая также настраивает внешний ключ `bookings.event_id → events.id`.
+
+### Миграции
+
+Создание новой миграции:
+```bash
+dotnet ef migrations add <MigrationName>
+```
+
+Применение миграций вручную (опционально — приложение делает это автоматически при старте):
+```bash
+dotnet ef database update
+```
 
 ### Запуск
 
@@ -51,8 +63,17 @@ Swagger UI: `https://localhost:5001/swagger`
 ## Запуск тестов
 
 ```bash
+# Все тесты (юнит + интеграционные)
 dotnet test
+
+# Только юнит-тесты
+dotnet test EventTrackerApi.Tests
+
+# Только интеграционные тесты
+dotnet test EventTrackerApi.IntegrationTests
 ```
+
+> **Важно:** для запуска интеграционных тестов должен быть запущен **Docker** (Docker Desktop или Docker Engine). Тесты автоматически поднимают контейнер PostgreSQL через Testcontainers, применяют миграции и выполняют проверки на реальной базе данных.
 
 ## API Endpoints
 
@@ -418,7 +439,10 @@ POST /events/550e8400-e29b-41d4-a716-446655440000/book
 
 ## Тестирование
 
-Проект покрыт юнит-тестами с использованием xUnit. Для интеграционного тестирования сервисов используется InMemory-провайдер Entity Framework Core. Для тестирования контроллеров используется Moq.
+Проект покрыт юнит-тестами с использованием xUnit и интеграционными тестами с реальной PostgreSQL через Testcontainers.
+
+- **Юнит-тесты** (`EventTrackerApi.Tests`) — тестируют бизнес-логику сервисов с использованием InMemory-провайдера EF Core и Moq для контроллеров.
+- **Интеграционные тесты** (`EventTrackerApi.IntegrationTests`) — тестируют слой доступа к данным (репозитории) на реальной PostgreSQL в Docker-контейнере. Между тестами база данных приводится к чистому состоянию (`EnsureDeleted` + `Migrate`), что гарантирует изолированность.
 
 Запуск всех тестов:
 ```bash
@@ -432,7 +456,9 @@ dotnet test --verbosity normal
 
 ### Покрытие тестами
 
-#### Тесты сервиса событий (EventServiceTests)
+#### Юнит-тесты
+
+##### Тесты сервиса событий (EventServiceTests)
 - Создание события с `TotalSeats`
 - Получение всех событий с фильтрацией и пагинацией
 - Получение события по ID
@@ -444,7 +470,7 @@ dotnet test --verbosity normal
 - Комбинированная фильтрация
 - Неуспешные сценарии (несуществующий ID, невалидный `TotalSeats`)
 
-#### Тесты контроллера событий (EventsControllerTests)
+##### Тесты контроллера событий (EventsControllerTests)
 - Получение списка с пагинацией и фильтрацией
 - Получение события по ID (успех и не найдено)
 - Создание события (CreatedAtAction)
@@ -453,7 +479,7 @@ dotnet test --verbosity normal
 - Создание брони (Accepted, NotFound, Conflict)
 - Изоляция тестов через Mock<IEventService>
 
-#### Тесты сервиса бронирований (BookingServiceTests)
+##### Тесты сервиса бронирований (BookingServiceTests)
 - Создание брони уменьшает `AvailableSeats` на 1
 - Создание нескольких броней до лимита — все успешны, уникальные ID
 - После исчерпания мест выбрасывается `NoAvailableSeatsException`
@@ -465,3 +491,26 @@ dotnet test --verbosity normal
 - **Конкурентные тесты:**
   - Защита от овербукинга (5 мест, 20 запросов — ровно 5 успешных)
   - Уникальность ID при 10 конкурентных запросах
+
+#### Интеграционные тесты (RepositoryIntegrationTests)
+
+Интеграционные тесты выполняются на реальной PostgreSQL в Docker-контейнере (Testcontainers):
+
+##### Репозиторий событий (EventRepository)
+- `AddAsync` + `GetByIdAsync` — создание и получение события
+- `GetByIdAsync` с несуществующим ID — возвращает `null`
+- `GetEventsAsync` без фильтров — возвращает все события
+- `GetEventsAsync` с фильтром по названию
+- `GetEventsAsync` с фильтром по диапазону дат
+- `GetEventsAsync` с пагинацией
+- `SetValues` + `SaveChangesAsync` — обновление события
+- `Remove` + `SaveChangesAsync` — удаление события
+
+##### Репозиторий бронирований (BookingRepository)
+- `AddAsync` + `GetByIdAsync` — создание и получение брони с загрузкой связанного события
+- `GetPendingAsync` — возвращает только брони в статусе `Pending`
+
+##### Проверка миграций
+- Таблицы `events` и `bookings` созданы в схеме
+- Внешний ключ `bookings.event_id → events.id` работает корректно
+- Нарушение внешнего ключа вызывает `DbUpdateException`
