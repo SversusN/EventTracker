@@ -1,9 +1,9 @@
-using EventTrackerApi.Controllers;
-using EventTrackerApi.Exceptions;
-using EventTrackerApi.Infrastructure.Mappers;
-using EventTrackerApi.Models;
-using EventTrackerApi.Models.Dto;
-using EventTrackerApi.Services;
+using EventTrackerApi.Domain.Models;
+using EventTrackerApi.Domain.Exceptions;
+using EventTrackerApi.Application.DTOs;
+using EventTrackerApi.Application.Mappers;
+using EventTrackerApi.Application.Services;
+using EventTrackerApi.Presentation.Controllers;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 

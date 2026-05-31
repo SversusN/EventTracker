@@ -1,8 +1,9 @@
-using EventTrackerApi.DataAccess;
-using EventTrackerApi.DataAccess.Repositories;
-using EventTrackerApi.Exceptions;
-using EventTrackerApi.Models;
-using EventTrackerApi.Services;
+using EventTrackerApi.Domain.Models;
+using EventTrackerApi.Domain.Exceptions;
+using EventTrackerApi.Application.Ports;
+using EventTrackerApi.Application.Services;
+using EventTrackerApi.Infrastructure.DataAccess;
+using EventTrackerApi.Infrastructure.DataAccess.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
