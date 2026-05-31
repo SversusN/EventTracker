@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
-using EventTrackerApi.Exceptions;
+using EventTrackerApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EventTrackerApi.Middleware;
+namespace EventTrackerApi.Presentation.Middleware;
 
 /// <summary>
 /// MW для глобальной обработки исключений

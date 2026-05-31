@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace EventTrackerApi.Infrastructure;
+namespace EventTrackerApi.Presentation.Infrastructure;
 
 /// <summary>
 /// Общие настройки JSON сериализации для всего приложения

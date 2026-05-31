@@ -1,5 +1,8 @@
 <Solution>
-  <Project Path="EventTrackerApi.csproj" />
-  <Project Path="EventTrackerApi.IntegrationTests/EventTrackerApi.IntegrationTests.csproj" />
+  <Project Path="EventTrackerApi.Presentation.csproj" />
+  <Project Path="EventTrackerApi.Domain/EventTrackerApi.Domain.csproj" />
+  <Project Path="EventTrackerApi.Application/EventTrackerApi.Application.csproj" />
+  <Project Path="EventTrackerApi.Infrastructure/EventTrackerApi.Infrastructure.csproj" />
   <Project Path="EventTrackerApi.Tests/EventTrackerApi.Tests.csproj" />
+  <Project Path="EventTrackerApi.IntegrationTests/EventTrackerApi.IntegrationTests.csproj" />
 </Solution>

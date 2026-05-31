@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace EventTrackerApi.Infrastructure;
+namespace EventTrackerApi.Presentation.Infrastructure;
 
 /// <summary>
 /// Хелпер для создания ProblemDetails
