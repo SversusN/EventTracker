@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="EventTrackerApi.Tests\**\*.cs" />
+    <Content Remove="EventTrackerApi.Tests\**\*" />
+    <None Remove="EventTrackerApi.Tests\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="EventTrackerApi.IntegrationTests\**\*.cs" />
+    <Content Remove="EventTrackerApi.IntegrationTests\**\*" />
+    <None Remove="EventTrackerApi.IntegrationTests\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="EventTrackerApi.Domain\**\*.cs" />
+    <Content Remove="EventTrackerApi.Domain\**\*" />
+    <None Remove="EventTrackerApi.Domain\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="EventTrackerApi.Application\**\*.cs" />
+    <Content Remove="EventTrackerApi.Application\**\*" />
+    <None Remove="EventTrackerApi.Application\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="EventTrackerApi.Infrastructure\**\*.cs" />
+    <Content Remove="EventTrackerApi.Infrastructure\**\*" />
+    <None Remove="EventTrackerApi.Infrastructure\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="EventApi_Sprint5\**\*.cs" />
+    <Content Remove="EventApi_Sprint5\**\*" />
+    <None Remove="EventApi_Sprint5\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="EventTrackerApi.Domain\EventTrackerApi.Domain.csproj" />
+    <ProjectReference Include="EventTrackerApi.Application\EventTrackerApi.Application.csproj" />
+    <ProjectReference Include="EventTrackerApi.Infrastructure\EventTrackerApi.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
+  </ItemGroup>
+
+</Project>
