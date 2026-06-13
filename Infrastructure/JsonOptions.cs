@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EventTrackerApi.Presentation.Infrastructure;
 
@@ -12,6 +13,7 @@ public static class JsonOptions
     /// </summary>
     public static readonly JsonSerializerOptions Default = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
     };
 }
