@@ -180,12 +180,17 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         using var context = CreateContext();
         var eventRepository = new EventRepository(context);
         var bookingRepository = new BookingRepository(context);
+        var userRepository = new UserRepository(context);
 
         var @event = new Event("Test Event", null, DateTime.UtcNow, DateTime.UtcNow.AddHours(1), 10);
         await eventRepository.AddAsync(@event);
         await eventRepository.SaveChangesAsync();
 
-        var booking = new Booking(@event.Id, Guid.NewGuid());
+        var user = new User("testuser", "hash");
+        await userRepository.AddAsync(user);
+        await userRepository.SaveChangesAsync();
+
+        var booking = new Booking(@event.Id, user.Id);
         await bookingRepository.AddAsync(booking);
         await bookingRepository.SaveChangesAsync();
 
@@ -206,16 +211,20 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         using var context = CreateContext();
         var eventRepository = new EventRepository(context);
         var bookingRepository = new BookingRepository(context);
+        var userRepository = new UserRepository(context);
 
         var @event = new Event("Test Event", null, DateTime.UtcNow, DateTime.UtcNow.AddHours(1), 10);
         await eventRepository.AddAsync(@event);
         await eventRepository.SaveChangesAsync();
 
-        var userId = Guid.NewGuid();
-        var pending = new Booking(@event.Id, userId);
-        var confirmed = new Booking(@event.Id, userId);
+        var user = new User("testuser", "hash");
+        await userRepository.AddAsync(user);
+        await userRepository.SaveChangesAsync();
+
+        var pending = new Booking(@event.Id, user.Id);
+        var confirmed = new Booking(@event.Id, user.Id);
         confirmed.Confirm();
-        var rejected = new Booking(@event.Id, userId);
+        var rejected = new Booking(@event.Id, user.Id);
         rejected.Reject();
 
         await bookingRepository.AddAsync(pending);
@@ -253,9 +262,14 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         bookingsCmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_name = 'bookings'";
         var bookingsResult = await bookingsCmd.ExecuteScalarAsync();
 
+        await using var usersCmd = connection.CreateCommand();
+        usersCmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_name = 'users'";
+        var usersResult = await usersCmd.ExecuteScalarAsync();
+
         // Assert
         Assert.NotNull(eventsResult);
         Assert.NotNull(bookingsResult);
+        Assert.NotNull(usersResult);
     }
 
     [Fact]
@@ -265,12 +279,17 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         using var context = CreateContext();
         var eventRepository = new EventRepository(context);
         var bookingRepository = new BookingRepository(context);
+        var userRepository = new UserRepository(context);
 
         var @event = new Event("Test", null, DateTime.UtcNow, DateTime.UtcNow.AddHours(1), 10);
         await eventRepository.AddAsync(@event);
         await eventRepository.SaveChangesAsync();
 
-        var booking = new Booking(@event.Id, Guid.NewGuid());
+        var user = new User("testuser", "hash");
+        await userRepository.AddAsync(user);
+        await userRepository.SaveChangesAsync();
+
+        var booking = new Booking(@event.Id, user.Id);
         await bookingRepository.AddAsync(booking);
         await bookingRepository.SaveChangesAsync();
 
