@@ -29,7 +29,7 @@ REST API сервис для управления мероприятиями и 
 | Проект | Назначение | Зависимости |
 |--------|-----------|-------------|
 | `EventTrackerApi.Domain` | Доменные сущности (`Event`, `Booking`, `User`), перечисления (`BookingStatus`, `UserRole`), доменные исключения (`NoAvailableSeatsException`, `EventAlreadyStartedException`, `BookingLimitExceededException`, `ForbiddenOperationException`) | — |
-| `EventTrackerApi.Application` | Use cases, сервисы (`EventService`, `BookingService`, `AuthService`), интерфейсы портов (`IEventRepository`, `IBookingRepository`, `IUserRepository`), DTO, мапперы | `Domain` |
+| `EventTrackerApi.Application` | Use cases, сервисы (`EventService`, `BookingService`, `UserService`), интерфейсы портов (`IEventRepository`, `IBookingRepository`, `IUserRepository`), DTO, мапперы | `Domain` |
 | `EventTrackerApi.Infrastructure` | Реализации портов (`EventRepository`, `BookingRepository`, `UserRepository`), `DbContext`, миграции EF Core, сервисы безопасности (`PasswordHasher`, `TokenService`) | `Domain`, `Application` |
 | `EventTrackerApi.Presentation` | Контроллеры, middleware, глобальная обработка исключений, composition root (`Program.cs`) | `Domain`, `Application`, `Infrastructure` |
 

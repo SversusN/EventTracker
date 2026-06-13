@@ -56,6 +56,30 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 Title = "Нет свободных мест",
                 Detail = exception.Message
             },
+            BookingLimitExceededException => new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.Conflict,
+                Title = "Превышен лимит броней",
+                Detail = exception.Message
+            },
+            EventAlreadyStartedException => new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.BadRequest,
+                Title = "Событие уже началось",
+                Detail = exception.Message
+            },
+            ForbiddenOperationException => new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.Forbidden,
+                Title = "Доступ запрещён",
+                Detail = exception.Message
+            },
+            InvalidCredentialsException => new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.NotFound,
+                Title = "Пользователь не найден",
+                Detail = exception.Message
+            },
             _ => new ProblemDetails
             {
                 Status = (int)HttpStatusCode.InternalServerError,

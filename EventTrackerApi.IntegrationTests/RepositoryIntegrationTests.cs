@@ -171,6 +171,47 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
 
     #endregion
 
+    #region UserRepository
+
+    [Fact]
+    public async Task UserRepository_AddAsync_DuplicateLogin_ShouldThrowException()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var userRepository = new UserRepository(context);
+
+        var firstUser = new User("uniqueuser", "hash1");
+        await userRepository.AddAsync(firstUser);
+        await userRepository.SaveChangesAsync();
+
+        var duplicateUser = new User("uniqueuser", "hash2");
+        await userRepository.AddAsync(duplicateUser);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<DbUpdateException>(() => userRepository.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task UserRepository_GetByLoginAsync_ShouldReturnUser()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var userRepository = new UserRepository(context);
+
+        var user = new User("findme", "hash");
+        await userRepository.AddAsync(user);
+        await userRepository.SaveChangesAsync();
+
+        // Act
+        var result = await userRepository.GetByLoginAsync("findme");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("findme", result.Login);
+    }
+
+    #endregion
+
     #region BookingRepository
 
     [Fact]

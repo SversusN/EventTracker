@@ -1,7 +1,9 @@
 using EventTrackerApi.Domain.Models;
 using EventTrackerApi.Domain.Exceptions;
+using EventTrackerApi.Application.Options;
 using EventTrackerApi.Application.Ports;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EventTrackerApi.Application.Services;
 
@@ -12,10 +14,11 @@ public class BookingService(
     IEventRepository eventRepository,
     IBookingRepository bookingRepository,
     IUserRepository userRepository,
+    IOptions<BookingOptions> bookingOptions,
     ILogger<BookingService> logger) : IBookingService
 {
-    private const int MaxActiveBookingsPerUser = 10;
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
+    private readonly int _maxActiveBookingsPerUser = bookingOptions.Value.MaxActiveBookingsPerUser;
 
     public async Task<Booking> CreateBookingAsync(Guid eventId, Guid userId)
     {
@@ -45,10 +48,10 @@ public class BookingService(
             }
 
             var activeBookings = await bookingRepository.GetActiveByUserIdAsync(userId);
-            if (activeBookings.Count() >= MaxActiveBookingsPerUser)
+            if (activeBookings.Count() >= _maxActiveBookingsPerUser)
             {
-                logger.LogWarning("Cannot create booking: user {UserId} has reached the limit of {Limit} active bookings", userId, MaxActiveBookingsPerUser);
-                throw new BookingLimitExceededException($"User has reached the limit of {MaxActiveBookingsPerUser} active bookings.");
+                logger.LogWarning("Cannot create booking: user {UserId} has reached the limit of {Limit} active bookings", userId, _maxActiveBookingsPerUser);
+                throw new BookingLimitExceededException($"User has reached the limit of {_maxActiveBookingsPerUser} active bookings.");
             }
 
             if (!eventItem.TryReserveSeats())

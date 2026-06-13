@@ -1,11 +1,13 @@
 using EventTrackerApi.Domain.Models;
 using EventTrackerApi.Domain.Exceptions;
+using EventTrackerApi.Application.Options;
 using EventTrackerApi.Application.Ports;
 using EventTrackerApi.Application.Services;
 using EventTrackerApi.Infrastructure.DataAccess;
 using EventTrackerApi.Infrastructure.DataAccess.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace EventTrackerApi.Tests;
 
@@ -28,6 +30,7 @@ public class BookingServiceTests : IDisposable
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEventService, EventService>();
+        services.AddSingleton<IOptions<BookingOptions>>(Options.Create(new BookingOptions()));
         services.AddScoped<IBookingService, BookingService>();
 
         _serviceProvider = services.BuildServiceProvider();
@@ -49,9 +52,9 @@ public class BookingServiceTests : IDisposable
             "Test Event", null, startAt ?? DateTime.Now.AddHours(1), DateTime.Now.AddHours(2), totalSeats);
     }
 
-    private async Task<Guid> CreateTestUser(string login = "testuser")
+    private async Task<Guid> CreateTestUser(string login = "testuser", UserRole role = UserRole.User)
     {
-        var user = new User(login, "passwordHash123");
+        var user = new User(login, "passwordHash123", role);
         await _userRepository.AddAsync(user);
         await _userRepository.SaveChangesAsync();
         return user.Id;
@@ -272,6 +275,60 @@ public class BookingServiceTests : IDisposable
 
         // Assert
         Assert.Equal(BookingStatus.Pending, booking.Status);
+    }
+
+    #endregion
+
+    #region Отмена бронирования
+
+    [Fact]
+    public async Task CancelBookingAsync_ByOwner_CancelsBookingAndReleasesSeats()
+    {
+        // Arrange
+        var userId = await CreateTestUser();
+        var @event = await CreateTestEvent(1);
+        var booking = await _bookingService.CreateBookingAsync(@event.Id, userId);
+
+        // Act
+        await _bookingService.CancelBookingAsync(booking.Id, userId);
+
+        // Assert
+        var cancelledBooking = await _bookingService.GetBookingByIdAsync(booking.Id);
+        Assert.Equal(BookingStatus.Cancelled, cancelledBooking!.Status);
+
+        var updatedEvent = await _eventService.GetEventByIdAsync(@event.Id);
+        Assert.Equal(1, updatedEvent!.AvailableSeats);
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_ByAnotherUser_ThrowsForbiddenOperationException()
+    {
+        // Arrange
+        var ownerId = await CreateTestUser("owner");
+        var otherUserId = await CreateTestUser("other");
+        var @event = await CreateTestEvent(1);
+        var booking = await _bookingService.CreateBookingAsync(@event.Id, ownerId);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ForbiddenOperationException>(() =>
+            _bookingService.CancelBookingAsync(booking.Id, otherUserId));
+    }
+
+    [Fact]
+    public async Task CancelBookingAsync_ByAdmin_CancelsAnyBooking()
+    {
+        // Arrange
+        var ownerId = await CreateTestUser("owner");
+        var adminId = await CreateTestUser("admin", UserRole.Admin);
+        var @event = await CreateTestEvent(1);
+        var booking = await _bookingService.CreateBookingAsync(@event.Id, ownerId);
+
+        // Act
+        await _bookingService.CancelBookingAsync(booking.Id, adminId);
+
+        // Assert
+        var cancelledBooking = await _bookingService.GetBookingByIdAsync(booking.Id);
+        Assert.Equal(BookingStatus.Cancelled, cancelledBooking!.Status);
     }
 
     #endregion

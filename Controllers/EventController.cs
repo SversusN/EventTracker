@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using EventTrackerApi.Presentation.Infrastructure;
+using EventTrackerApi.Presentation.Infrastructure.Controllers;
 using EventTrackerApi.Application.DTOs;
 using EventTrackerApi.Application.Mappers;
 using EventTrackerApi.Application.Services;
@@ -146,7 +146,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
-        var userId = GetCurrentUserId();
+        var userId = this.GetCurrentUserId();
         var booking = await _bookingService.CreateBookingAsync(id, userId);
 
         var response = new BookingResponseDto(
@@ -165,13 +165,4 @@ public class EventsController(IEventService eventService, IBookingService bookin
             value: response);
     }
 
-    private Guid GetCurrentUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new InvalidOperationException("User identifier is missing or invalid.");
-        }
-        return userId;
-    }
 }

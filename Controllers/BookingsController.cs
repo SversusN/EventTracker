@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using EventTrackerApi.Presentation.Infrastructure;
+using EventTrackerApi.Presentation.Infrastructure.Controllers;
 using EventTrackerApi.Application.DTOs;
 using EventTrackerApi.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -53,18 +53,9 @@ public class BookingsController(IBookingService bookingService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CancelBooking(Guid id)
     {
-        var userId = GetCurrentUserId();
+        var userId = this.GetCurrentUserId();
         await bookingService.CancelBookingAsync(id, userId);
         return NoContent();
     }
 
-    private Guid GetCurrentUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new InvalidOperationException("User identifier is missing or invalid.");
-        }
-        return userId;
-    }
 }
