@@ -62,13 +62,11 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Введите JWT токен в формате: Bearer {token}"
     });
 
-    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
+    options.AddSecurityRequirement(document =>
+        new OpenApiSecurityRequirement
         {
-            new OpenApiSecuritySchemeReference("Bearer"),
-            new List<string>()
-        }
-    });
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
 });
 
 builder.Services.AddInfrastructureServices(builder.Configuration);
