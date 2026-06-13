@@ -8,18 +8,29 @@ namespace EventTrackerApi.Application.Services;
 /// <summary>
 /// Сервис для работы с бронированиями
 /// </summary>
-public class BookingService(IEventRepository eventRepository, IBookingRepository bookingRepository, ILogger<BookingService> logger) : IBookingService
+public class BookingService(
+    IEventRepository eventRepository,
+    IBookingRepository bookingRepository,
+    IUserRepository userRepository,
+    ILogger<BookingService> logger) : IBookingService
 {
+    private const int MaxActiveBookingsPerUser = 10;
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
 
-    public async Task<Booking> CreateBookingAsync(Guid eventId)
+    public async Task<Booking> CreateBookingAsync(Guid eventId, Guid userId)
     {
-        logger.LogInformation("Creating booking for event {EventId}", eventId);
+        logger.LogInformation("Creating booking for event {EventId} by user {UserId}", eventId, userId);
 
         await BookingLock.WaitAsync();
         try
         {
-            // Проверяем существование события
+            var user = await userRepository.GetByIdAsync(userId);
+            if (user is null)
+            {
+                logger.LogWarning("Cannot create booking: user {UserId} not found", userId);
+                throw new KeyNotFoundException($"User with id '{userId}' not found.");
+            }
+
             var eventItem = await eventRepository.GetByIdAsync(eventId);
             if (eventItem is null)
             {
@@ -27,20 +38,31 @@ public class BookingService(IEventRepository eventRepository, IBookingRepository
                 throw new KeyNotFoundException($"Event with id '{eventId}' not found.");
             }
 
-            // Проверяем доступные места
+            if (eventItem.StartAt <= DateTime.UtcNow)
+            {
+                logger.LogWarning("Cannot create booking: event {EventId} has already started", eventId);
+                throw new EventAlreadyStartedException("Cannot book an event that has already started.");
+            }
+
+            var activeBookings = await bookingRepository.GetActiveByUserIdAsync(userId);
+            if (activeBookings.Count() >= MaxActiveBookingsPerUser)
+            {
+                logger.LogWarning("Cannot create booking: user {UserId} has reached the limit of {Limit} active bookings", userId, MaxActiveBookingsPerUser);
+                throw new BookingLimitExceededException($"User has reached the limit of {MaxActiveBookingsPerUser} active bookings.");
+            }
+
             if (!eventItem.TryReserveSeats())
             {
                 logger.LogWarning("Cannot create booking: no available seats for event {EventId}", eventId);
                 throw new NoAvailableSeatsException("No available seats for this event");
             }
 
-            // Создаём бронь в статусе Pending
-            var booking = new Booking(eventId);
+            var booking = new Booking(eventId, userId);
             await bookingRepository.AddAsync(booking);
             await bookingRepository.SaveChangesAsync();
 
-            logger.LogInformation("Created booking {BookingId} for event {EventId} with status {Status}. Available seats left: {AvailableSeats}",
-                booking.Id, eventId, booking.Status, eventItem.AvailableSeats);
+            logger.LogInformation("Created booking {BookingId} for event {EventId} by user {UserId}. Available seats left: {AvailableSeats}",
+                booking.Id, eventId, userId, eventItem.AvailableSeats);
 
             return booking;
         }
@@ -62,5 +84,55 @@ public class BookingService(IEventRepository eventRepository, IBookingRepository
         }
 
         return booking;
+    }
+
+    public async Task CancelBookingAsync(Guid bookingId, Guid userId)
+    {
+        logger.LogInformation("Cancelling booking {BookingId} by user {UserId}", bookingId, userId);
+
+        await BookingLock.WaitAsync();
+        try
+        {
+            var booking = await bookingRepository.GetByIdAsync(bookingId);
+            if (booking is null)
+            {
+                logger.LogWarning("Cannot cancel booking: booking {BookingId} not found", bookingId);
+                throw new KeyNotFoundException($"Booking with id '{bookingId}' not found.");
+            }
+
+            var currentUser = await userRepository.GetByIdAsync(userId);
+            if (currentUser is null)
+            {
+                logger.LogWarning("Cannot cancel booking: user {UserId} not found", userId);
+                throw new KeyNotFoundException($"User with id '{userId}' not found.");
+            }
+
+            if (currentUser.Role != UserRole.Admin && booking.UserId != userId)
+            {
+                logger.LogWarning("Cannot cancel booking {BookingId}: user {UserId} does not have permission", bookingId, userId);
+                throw new ForbiddenOperationException("You can only cancel your own bookings.");
+            }
+
+            var eventItem = await eventRepository.GetByIdAsync(booking.EventId);
+
+            // Бронь активна, если она в статусе Pending или Confirmed
+            var wasActive = booking.Status == BookingStatus.Pending || booking.Status == BookingStatus.Confirmed;
+
+            booking.Cancel();
+            bookingRepository.Update(booking);
+
+            if (wasActive && eventItem is not null)
+            {
+                eventItem.ReleaseSeats();
+            }
+
+            await bookingRepository.SaveChangesAsync();
+
+            logger.LogInformation("Booking {BookingId} cancelled by user {UserId}", bookingId, userId);
+        }
+        finally
+        {
+            BookingLock.Release();
+        }
     }
 }
