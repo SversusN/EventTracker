@@ -4,8 +4,10 @@ using EventTrackerApi.Application.DTOs;
 using EventTrackerApi.Application.Mappers;
 using EventTrackerApi.Application.Services;
 using EventTrackerApi.Presentation.Controllers;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using System.Security.Claims;
 
 namespace EventTrackerApi.Tests;
 
@@ -20,6 +22,21 @@ public class EventsControllerTests
         _eventServiceMock = new Mock<IEventService>();
         _bookingServiceMock = new Mock<IBookingService>();
         _controller = new EventsController(_eventServiceMock.Object, _bookingServiceMock.Object);
+    }
+
+    private void SetAuthenticatedUser(Guid userId, string role = "User")
+    {
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                    new Claim(ClaimTypes.Role, role)
+                }, "TestAuth"))
+            }
+        };
     }
 
     #region GET /events - Получение списка с фильтрацией и пагинацией
@@ -404,11 +421,13 @@ public class EventsControllerTests
     public async Task CreateBooking_WithExistingEvent_ReturnsAccepted()
     {
         // Arrange
+        var userId = Guid.NewGuid();
         var eventId = Guid.NewGuid();
-        var booking = new Booking(eventId);
-        
+        var booking = new Booking(eventId, userId);
+        SetAuthenticatedUser(userId);
+
         _bookingServiceMock
-            .Setup(s => s.CreateBookingAsync(eventId))
+            .Setup(s => s.CreateBookingAsync(eventId, userId))
             .ReturnsAsync(booking);
 
         // Act
@@ -418,18 +437,20 @@ public class EventsControllerTests
         var acceptedResult = Assert.IsType<AcceptedAtActionResult>(result);
         var response = Assert.IsType<BookingResponseDto>(acceptedResult.Value);
         Assert.Equal(booking.Id, response.Id);
-        
-        _bookingServiceMock.Verify(s => s.CreateBookingAsync(eventId), Times.Once);
+
+        _bookingServiceMock.Verify(s => s.CreateBookingAsync(eventId, userId), Times.Once);
     }
 
     [Fact]
     public async Task CreateBooking_WhenNoSeatsAvailable_PropagatesNoAvailableSeatsException()
     {
         // Arrange
+        var userId = Guid.NewGuid();
         var eventId = Guid.NewGuid();
-        
+        SetAuthenticatedUser(userId);
+
         _bookingServiceMock
-            .Setup(s => s.CreateBookingAsync(eventId))
+            .Setup(s => s.CreateBookingAsync(eventId, userId))
             .ThrowsAsync(new NoAvailableSeatsException("No available seats for this event"));
 
         // Act & Assert
@@ -440,10 +461,12 @@ public class EventsControllerTests
     public async Task CreateBooking_WhenEventNotFound_PropagatesKeyNotFoundException()
     {
         // Arrange
+        var userId = Guid.NewGuid();
         var eventId = Guid.NewGuid();
-        
+        SetAuthenticatedUser(userId);
+
         _bookingServiceMock
-            .Setup(s => s.CreateBookingAsync(eventId))
+            .Setup(s => s.CreateBookingAsync(eventId, userId))
             .ThrowsAsync(new KeyNotFoundException($"Event with id '{eventId}' not found."));
 
         // Act & Assert

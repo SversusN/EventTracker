@@ -185,7 +185,7 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         await eventRepository.AddAsync(@event);
         await eventRepository.SaveChangesAsync();
 
-        var booking = new Booking(@event.Id);
+        var booking = new Booking(@event.Id, Guid.NewGuid());
         await bookingRepository.AddAsync(booking);
         await bookingRepository.SaveChangesAsync();
 
@@ -211,10 +211,11 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         await eventRepository.AddAsync(@event);
         await eventRepository.SaveChangesAsync();
 
-        var pending = new Booking(@event.Id);
-        var confirmed = new Booking(@event.Id);
+        var userId = Guid.NewGuid();
+        var pending = new Booking(@event.Id, userId);
+        var confirmed = new Booking(@event.Id, userId);
         confirmed.Confirm();
-        var rejected = new Booking(@event.Id);
+        var rejected = new Booking(@event.Id, userId);
         rejected.Reject();
 
         await bookingRepository.AddAsync(pending);
@@ -269,7 +270,7 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         await eventRepository.AddAsync(@event);
         await eventRepository.SaveChangesAsync();
 
-        var booking = new Booking(@event.Id);
+        var booking = new Booking(@event.Id, Guid.NewGuid());
         await bookingRepository.AddAsync(booking);
         await bookingRepository.SaveChangesAsync();
 
@@ -285,7 +286,12 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
         // Arrange
         using var context = CreateContext();
         var bookingRepository = new BookingRepository(context);
-        var booking = new Booking(Guid.NewGuid());
+        var userRepository = new UserRepository(context);
+        var user = new User("testuser", "hash", UserRole.User);
+        await userRepository.AddAsync(user);
+        await userRepository.SaveChangesAsync();
+
+        var booking = new Booking(Guid.NewGuid(), user.Id);
         await bookingRepository.AddAsync(booking);
 
         // Act & Assert

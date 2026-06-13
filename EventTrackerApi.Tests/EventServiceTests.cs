@@ -54,8 +54,8 @@ public class EventServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(title, result.Title);
         Assert.Equal(description, result.Description);
-        Assert.Equal(startAt, result.StartAt);
-        Assert.Equal(endAt, result.EndAt);
+        Assert.Equal(startAt.ToUniversalTime(), result.StartAt);
+        Assert.Equal(endAt.ToUniversalTime(), result.EndAt);
         Assert.Equal(totalSeats, result.TotalSeats);
         Assert.Equal(totalSeats, result.AvailableSeats);
         Assert.NotEqual(Guid.Empty, result.Id);
@@ -161,8 +161,8 @@ public class EventServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(newTitle, result.Title);
         Assert.Equal(newDescription, result.Description);
-        Assert.Equal(newStartAt, result.StartAt);
-        Assert.Equal(newEndAt, result.EndAt);
+        Assert.Equal(newStartAt.ToUniversalTime(), result.StartAt);
+        Assert.Equal(newEndAt.ToUniversalTime(), result.EndAt);
         Assert.Equal(createdEvent.TotalSeats, result.TotalSeats);
         Assert.Equal(createdEvent.AvailableSeats, result.AvailableSeats);
     }
