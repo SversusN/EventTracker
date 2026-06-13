@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using EventTrackerApi.Presentation.Infrastructure;
 using EventTrackerApi.Application.DTOs;
 using EventTrackerApi.Application.Mappers;
 using EventTrackerApi.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventTrackerApi.Presentation.Controllers;
@@ -19,12 +21,6 @@ public class EventsController(IEventService eventService, IBookingService bookin
     /// <summary>
     /// Получить список событий с фильтрацией и пагинацией
     /// </summary>
-    /// <param name="title">Поиск по названию (частичное совпадение, регистронезависимый)</param>
-    /// <param name="from">События, начинающиеся не раньше указанной даты</param>
-    /// <param name="to">События, заканчивающиеся не позже указанной даты</param>
-    /// <param name="page">Номер страницы (начиная с 1)</param>
-    /// <param name="pageSize">Количество элементов на странице (больше 0)</param>
-    /// <returns>Список событий с информацией о пагинации</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResult<EventResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -52,7 +48,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
             TotalCount = result.TotalCount,
             Page = result.Page,
             PageSize = result.PageSize,
-            Items = EventTrackerApi.Application.Mappers.EventMapper.ToResponseDtoList(result.Items)
+            Items = EventMapper.ToResponseDtoList(result.Items)
         };
 
         return Ok(response);
@@ -61,8 +57,6 @@ public class EventsController(IEventService eventService, IBookingService bookin
     /// <summary>
     /// Получить событие по идентификатору
     /// </summary>
-    /// <param name="id">Идентификатор события (GUID)</param>
-    /// <returns>Событие с указанным идентификатором</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -77,13 +71,14 @@ public class EventsController(IEventService eventService, IBookingService bookin
     }
 
     /// <summary>
-    /// Создать новое событие
+    /// Создать новое событие (только для администраторов)
     /// </summary>
-    /// <param name="dto">Данные для создания события</param>
-    /// <returns>Созданное событие с идентификатором</returns>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateEvent([FromBody] CreateEventDto dto)
     {
         if (!ModelState.IsValid)
@@ -96,15 +91,15 @@ public class EventsController(IEventService eventService, IBookingService bookin
     }
 
     /// <summary>
-    /// Обновить существующее событие
+    /// Обновить существующее событие (только для администраторов)
     /// </summary>
-    /// <param name="id">Идентификатор события для обновления</param>
-    /// <param name="dto">Новые данные события</param>
-    /// <returns>Обновленное событие</returns>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventDto dto)
     {
         if (!ModelState.IsValid)
@@ -121,13 +116,14 @@ public class EventsController(IEventService eventService, IBookingService bookin
     }
 
     /// <summary>
-    /// Удалить событие по идентификатору
+    /// Удалить событие по идентификатору (только для администраторов)
     /// </summary>
-    /// <param name="id">Идентификатор события для удаления</param>
-    /// <returns>Результат удаления</returns>
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteEvent(Guid id)
     {
         var deleted = await _eventService.DeleteEventAsync(id);
@@ -139,31 +135,43 @@ public class EventsController(IEventService eventService, IBookingService bookin
     }
 
     /// <summary>
-    /// Создать бронь для события
+    /// Создать бронь для события (требуется аутентификация)
     /// </summary>
-    /// <param name="id">Идентификатор события</param>
-    /// <returns>Созданная бронь со статусом Pending</returns>
     [HttpPost("{id:guid}/book")]
+    [Authorize]
     [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CreateBooking(Guid id)
     {
-        var booking = await _bookingService.CreateBookingAsync(id);
+        var userId = GetCurrentUserId();
+        var booking = await _bookingService.CreateBookingAsync(id, userId);
 
         var response = new BookingResponseDto(
             booking.Id,
             booking.EventId,
+            booking.UserId,
             booking.Status,
             booking.CreatedAt,
             booking.ProcessedAt
         );
 
-        // Возвращаем 202 Accepted с заголовком Location
         return AcceptedAtAction(
             actionName: nameof(BookingsController.GetBookingById),
             controllerName: "bookings",
             routeValues: new { id = booking.Id },
             value: response);
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new InvalidOperationException("User identifier is missing or invalid.");
+        }
+        return userId;
     }
 }
