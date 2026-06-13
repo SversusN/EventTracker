@@ -20,6 +20,14 @@ public class BookingRepository(AppDbContext context) : IBookingRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<Booking>> GetActiveByUserIdAsync(Guid userId)
+    {
+        return await _context.Bookings
+            .Where(b => b.UserId == userId &&
+                        (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed))
+            .ToListAsync();
+    }
+
     public async Task AddAsync(Booking booking)
     {
         await _context.Bookings.AddAsync(booking);
