@@ -4,9 +4,15 @@ REST API сервис для управления мероприятиями и 
 
 ## Функциональность
 
-- Управление событиями (CRUD операции) с ограничением мест
-- Фильтрация и пагинация событий
+- Управление событиями (CRUD операции) с ограничением мест (только для администраторов)
+- Фильтрация и пагинация событий (доступно всем)
+- JWT-аутентификация и авторизация на основе ролей (`User`, `Admin`)
+- Регистрация и вход пользователей
 - Бронирование событий с контролем доступных мест
+- Защитные бизнес-правила бронирования:
+  - нельзя бронировать уже начавшиеся события
+  - у одного пользователя не более **10 активных** броней (`Pending` / `Confirmed`)
+  - отмена брони доступна владельцу брони или администратору
 - Асинхронная обработка заявок на бронирование
 - Фоновая параллельная обработка бронирований с защитой от овербукинга
 - Потокобезопасные операции бронирования
@@ -22,9 +28,9 @@ REST API сервис для управления мероприятиями и 
 
 | Проект | Назначение | Зависимости |
 |--------|-----------|-------------|
-| `EventTrackerApi.Domain` | Доменные сущности (`Event`, `Booking`), перечисления (`BookingStatus`), доменные исключения (`NoAvailableSeatsException`) | — |
-| `EventTrackerApi.Application` | Use cases, сервисы (`EventService`, `BookingService`), интерфейсы портов (`IEventRepository`, `IBookingRepository`), DTO, мапперы | `Domain` |
-| `EventTrackerApi.Infrastructure` | Реализации портов (`EventRepository`, `BookingRepository`), `DbContext`, миграции EF Core | `Domain`, `Application` |
+| `EventTrackerApi.Domain` | Доменные сущности (`Event`, `Booking`, `User`), перечисления (`BookingStatus`, `UserRole`), доменные исключения (`NoAvailableSeatsException`, `EventAlreadyStartedException`, `BookingLimitExceededException`, `ForbiddenOperationException`) | — |
+| `EventTrackerApi.Application` | Use cases, сервисы (`EventService`, `BookingService`, `AuthService`), интерфейсы портов (`IEventRepository`, `IBookingRepository`, `IUserRepository`), DTO, мапперы | `Domain` |
+| `EventTrackerApi.Infrastructure` | Реализации портов (`EventRepository`, `BookingRepository`, `UserRepository`), `DbContext`, миграции EF Core, сервисы безопасности (`PasswordHasher`, `TokenService`) | `Domain`, `Application` |
 | `EventTrackerApi.Presentation` | Контроллеры, middleware, глобальная обработка исключений, composition root (`Program.cs`) | `Domain`, `Application`, `Infrastructure` |
 
 **Ключевое правило:** `Application` не зависит от `Infrastructure` напрямую — только через интерфейсы портов. Инфраструктурные реализации подключаются в `Program.cs` через DI.
@@ -44,11 +50,19 @@ REST API сервис для управления мероприятиями и 
 {
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=postgres"
+  },
+  "Jwt": {
+    "Secret": "your-32-char-min-secret-key-here!",
+    "Issuer": "EventTrackerApi",
+    "Audience": "EventTrackerClients",
+    "ExpiryHours": 24
   }
 }
 ```
 
-Схема базы данных управляется миграциями EF Core. При запуске приложения автоматически применяются все ожидающие миграции через `Migrate()`. Таблицы `events` и `bookings` создаются миграцией `InitialCreate`, которая также настраивает внешний ключ `bookings.event_id → events.id`.
+> **Важно:** секретный ключ `Jwt:Secret` должен быть минимум 32 символа (требование HMAC-SHA256). В production его следует хранить в переменных окружения / secrets, а не в `appsettings.json`.
+
+Схема базы данных управляется миграциями EF Core. При запуске приложения автоматически применяются все ожидающие миграции через `Migrate()`. Таблицы `events`, `bookings` и `users` создаются миграциями `InitialCreate` и `AddUsersAndBookingUserId`; настроены внешние ключи `bookings.event_id → events.id` и `bookings.user_id → users.id`.
 
 ### Миграции
 
@@ -89,6 +103,61 @@ dotnet test EventTrackerApi.IntegrationTests
 > **Важно:** для запуска интеграционных тестов должен быть запущен **Docker** (Docker Desktop или Docker Engine). Тесты автоматически поднимают контейнер PostgreSQL через Testcontainers, применяют миграции и выполняют проверки на реальной базе данных.
 
 ## API Endpoints
+
+### Аутентификация
+
+Все запросы к управлению событиями (создание/изменение/удаление), созданию и отмене броней требуют JWT-токена. Получить токен можно через эндпоинты `/auth`.
+
+#### Регистрация пользователя
+
+```http
+POST /auth/register
+Content-Type: application/json
+
+{
+  "login": "user1",
+  "password": "Str0ngP@ss!"
+}
+```
+
+**Response:** `204 No Content`
+
+> По умолчанию регистрируется пользователь с ролью `User`. При старте приложения автоматически создаётся seed-администратор (если его ещё нет в БД):
+>
+> | Поле | Значение |
+> |------|----------|
+> | Login | `admin` |
+> | Password | `Pass@word1` |
+> | Role | `Admin` |
+
+#### Вход в систему
+
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "login": "user1",
+  "password": "Str0ngP@ss!"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### Использование токена
+
+Передавайте токен в заголовке `Authorization`:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+В Swagger UI нажмите кнопку **Authorize** и введите `Bearer {ваш_токен}`.
 
 ### Получить все события (с фильтрацией и пагинацией)
 
@@ -176,15 +245,17 @@ DELETE /events/{id}
 
 ```http
 POST /events/{id}/book
+Authorization: Bearer {token}
 ```
 
-Создаёт бронь для указанного события. При успешном создании уменьшает `availableSeats` на 1. Возвращает `202 Accepted` с информацией о созданной брони и заголовком `Location` для отслеживания статуса.
+Создаёт бронь для указанного события от имени текущего аутентифицированного пользователя. При успешном создании уменьшает `availableSeats` на 1. Возвращает `202 Accepted` с информацией о созданной брони и заголовком `Location` для отслеживания статуса.
 
 **Response:**
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440001",
   "eventId": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "550e8400-e29b-41d4-a716-446655440002",
   "status": "Pending",
   "createdAt": "2026-03-29T18:30:00Z",
   "processedAt": null
@@ -193,8 +264,25 @@ POST /events/{id}/book
 
 **HTTP Statuses:**
 - `202 Accepted` - бронь создана и ожидает обработки
-- `404 Not Found` - событие не найдено
-- `409 Conflict` - нет свободных мест на событии
+- `400 Bad Request` - событие уже началось
+- `401 Unauthorized` - отсутствует или невалидный JWT
+- `404 Not Found` - событие или пользователь не найден
+- `409 Conflict` - нет свободных мест **или** превышен лимит активных броней (10)
+
+### Отменить бронь
+
+```http
+DELETE /bookings/{id}
+Authorization: Bearer {token}
+```
+
+Отменяет бронь. Доступно владельцу брони или администратору. При отмене активной брони (`Pending` / `Confirmed`) освобождает одно место на событии. Возвращает `204 No Content`.
+
+**HTTP Statuses:**
+- `204 No Content` - бронь отменена
+- `401 Unauthorized` - отсутствует или невалидный JWT
+- `403 Forbidden` - попытка отменить чужую бронь без роли `Admin`
+- `404 Not Found` - бронь или пользователь не найден
 
 ### Получить бронь по ID
 
@@ -219,6 +307,7 @@ GET /bookings/{id}
 - `Pending` - бронь создана, ожидает обработки
 - `Confirmed` - бронь подтверждена
 - `Rejected` - бронь отклонена
+- `Cancelled` - бронь отменена пользователем или администратором
 
 ## Валидация
 
@@ -231,10 +320,12 @@ GET /bookings/{id}
 - `200 OK` - успешный запрос
 - `201 Created` - событие создано
 - `202 Accepted` - бронь принята к обработке
-- `204 No Content` - событие удалено
-- `400 Bad Request` - ошибка валидации
+- `204 No Content` - событие удалено или бронь отменена
+- `400 Bad Request` - ошибка валидации или бронирование прошедшего события
+- `401 Unauthorized` - отсутствует или невалидный JWT
+- `403 Forbidden` - недостаточно прав (например, обычный пользователь пытается управлять событием или отменить чужую бронь)
 - `404 Not Found` - ресурс не найден
-- `409 Conflict` - нет свободных мест
+- `409 Conflict` - нет свободных мест или превышен лимит активных броней
 - `500 Internal Server Error` - внутренняя ошибка сервера
 
 ## Примитивы синхронизации
@@ -249,14 +340,22 @@ private static readonly SemaphoreSlim BookingLock = new(1, 1);
 await BookingLock.WaitAsync();
 try
 {
-    var eventItem = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+    var eventItem = await eventRepository.GetByIdAsync(eventId);
+    if (eventItem is null)
+        throw new KeyNotFoundException("Event not found");
+    if (eventItem.StartAt <= DateTime.UtcNow)
+        throw new EventAlreadyStartedException("Cannot book an event that has already started.");
+
+    var activeBookings = await bookingRepository.GetActiveByUserIdAsync(userId);
+    if (activeBookings.Count() >= MaxActiveBookingsPerUser)
+        throw new BookingLimitExceededException($"User has reached the limit of {MaxActiveBookingsPerUser} active bookings.");
+
     if (!eventItem.TryReserveSeats())
-    {
         throw new NoAvailableSeatsException("No available seats for this event");
-    }
-    var booking = new Booking(eventId);
-    _context.Bookings.Add(booking);
-    await _context.SaveChangesAsync();
+
+    var booking = new Booking(eventId, userId);
+    await bookingRepository.AddAsync(booking);
+    await bookingRepository.SaveChangesAsync();
 }
 finally
 {
@@ -285,28 +384,53 @@ finally
 ### Пример сценария использования
 
 ```bash
-# 1. Создаём событие на 3 места
-curl -X POST https://localhost:5001/events \
+# 1. Регистрируем пользователя
+curl -X POST http://localhost:5001/auth/register \
   -H "Content-Type: application/json" \
+  -d '{"login":"user1","password":"Str0ngP@ss!"}'
+
+# 2. Входим и получаем токен
+TOKEN=$(curl -s -X POST http://localhost:5001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"user1","password":"Str0ngP@ss!"}' | jq -r '.token')
+
+# 3. Получаем токен seed-администратора
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:5001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"admin","password":"Pass@word1"}' | jq -r '.token')
+
+# 4. Создаём событие на 3 места (требуется роль Admin)
+curl -X POST http://localhost:5001/events \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"title":"Конференция","description":"IT конференция","startAt":"2026-04-15T10:00:00","endAt":"2026-04-15T18:00:00","totalSeats":3}'
 
-# 2. Создаём три брони (все успешны, 202 Accepted)
-curl -X POST https://localhost:5001/events/{event-id}/book
-curl -X POST https://localhost:5001/events/{event-id}/book
-curl -X POST https://localhost:5001/events/{event-id}/book
+# 5. Создаём три брони (все успешны, 202 Accepted)
+curl -X POST http://localhost:5001/events/{event-id}/book \
+  -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:5001/events/{event-id}/book \
+  -H "Authorization: Bearer $TOKEN"
+curl -X POST http://localhost:5001/events/{event-id}/book \
+  -H "Authorization: Bearer $TOKEN"
 
-# 3. Четвёртая бронь вернёт 409 Conflict — мест больше нет
-curl -X POST https://localhost:5001/events/{event-id}/book
+# 6. Четвёртая бронь вернёт 409 Conflict — мест больше нет
+curl -X POST http://localhost:5001/events/{event-id}/book \
+  -H "Authorization: Bearer $TOKEN"
 
-# 4. Проверяем статус первой брони через несколько секунд — будет Confirmed
-curl https://localhost:5001/bookings/{booking-id}
+# 7. Проверяем статус первой брони через несколько секунд — будет Confirmed
+curl http://localhost:5001/bookings/{booking-id} \
+  -H "Authorization: Bearer $TOKEN"
+
+# 8. Отменяем свою бронь
+curl -X DELETE http://localhost:5001/bookings/{booking-id} \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Пример защиты от овербукинга
 
 Без синхронизации при 20 одновременных запросах на бронирование события на 5 мест могло бы создаться 20 броней, так как несколько потоков одновременно прочитали `availableSeats > 0`. 
 
-Благодаря `lock` в `BookingService` гарантируется, что:
+Благодаря `SemaphoreSlim` в `BookingService` гарантируется, что:
 - Проверка мест и их резервирование выполняются атомарно
 - При 20 конкурентных запросах на событие на 5 мест создаётся ровно 5 успешных броней
 - Остальные 15 запросов получают `409 Conflict`
@@ -436,10 +560,55 @@ GET /events/550e8400-e29b-41d4-a716-446655440000
 }
 ```
 
+### 400 Bad Request - Событие уже началось
+
+```http
+POST /events/550e8400-e29b-41d4-a716-446655440000/book
+Authorization: Bearer {token}
+```
+**Ответ:**
+```json
+{
+  "status": 400,
+  "title": "Ошибка запроса",
+  "detail": "Cannot book an event that has already started."
+}
+```
+
+### 401 Unauthorized - Отсутствует токен
+
+```http
+POST /events/550e8400-e29b-41d4-a716-446655440000/book
+```
+**Ответ:**
+```json
+{
+  "status": 401,
+  "title": "Unauthorized",
+  "detail": "You are not authorized to access this resource."
+}
+```
+
+### 403 Forbidden - Недостаточно прав
+
+```http
+DELETE /bookings/550e8400-e29b-41d4-a716-446655440001
+Authorization: Bearer {token-of-another-user}
+```
+**Ответ:**
+```json
+{
+  "status": 403,
+  "title": "Forbidden",
+  "detail": "You can only cancel your own bookings."
+}
+```
+
 ### 409 Conflict - Нет свободных мест
 
 ```http
 POST /events/550e8400-e29b-41d4-a716-446655440000/book
+Authorization: Bearer {token}
 ```
 **Ответ:**
 ```json
@@ -495,10 +664,14 @@ dotnet test --verbosity normal
 ##### Тесты сервиса бронирований (BookingServiceTests)
 - Создание брони уменьшает `AvailableSeats` на 1
 - Создание нескольких броней до лимита — все успешны, уникальные ID
+- Бронь связывается с пользователем через `UserId`
 - После исчерпания мест выбрасывается `NoAvailableSeatsException`
 - Бронирование несуществующего события — `KeyNotFoundException`
+- Бронирование уже начавшегося события — `EventAlreadyStartedException`
+- Превышение лимита активных броней (10) — `BookingLimitExceededException`
+- Лимит активных броней действует только на одного пользователя
 - Получение брони по ID
-- Смена статуса брони (`Confirm` / `Reject`)
+- Смена статуса брони (`Confirm` / `Reject` / `Cancel`)
 - `ReleaseSeats` восстанавливает доступные места
 - Брони для разных событий создаются корректно
 - **Конкурентные тесты:**
