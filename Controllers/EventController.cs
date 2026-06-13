@@ -1,9 +1,10 @@
-using EventTrackerApi.Infrastructure;
-using EventTrackerApi.Models.Dto;
-using EventTrackerApi.Services;
+using EventTrackerApi.Presentation.Infrastructure;
+using EventTrackerApi.Application.DTOs;
+using EventTrackerApi.Application.Mappers;
+using EventTrackerApi.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EventTrackerApi.Controllers;
+namespace EventTrackerApi.Presentation.Controllers;
 
 /// <summary>
 /// Контроллер для управления событиями (мероприятиями)
@@ -51,7 +52,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
             TotalCount = result.TotalCount,
             Page = result.Page,
             PageSize = result.PageSize,
-            Items = Infrastructure.Mappers.EventMapper.ToResponseDtoList(result.Items)
+            Items = EventTrackerApi.Application.Mappers.EventMapper.ToResponseDtoList(result.Items)
         };
 
         return Ok(response);
@@ -72,7 +73,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
         {
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
         }
-        return Ok(Infrastructure.Mappers.EventMapper.ToResponseDto(ev));
+        return Ok(EventMapper.ToResponseDto(ev));
     }
 
     /// <summary>
@@ -91,7 +92,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
         }
 
         var createdEvent = await _eventService.CreateEventAsync(dto.Title, dto.Description, dto.StartAt, dto.EndAt, dto.TotalSeats);
-        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, Infrastructure.Mappers.EventMapper.ToResponseDto(createdEvent));
+        return CreatedAtAction(nameof(GetEventById), new { id = createdEvent.Id }, EventMapper.ToResponseDto(createdEvent));
     }
 
     /// <summary>
@@ -116,7 +117,7 @@ public class EventsController(IEventService eventService, IBookingService bookin
         {
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
         }
-        return Ok(Infrastructure.Mappers.EventMapper.ToResponseDto(updatedEvent));
+        return Ok(EventMapper.ToResponseDto(updatedEvent));
     }
 
     /// <summary>

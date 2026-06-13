@@ -8,7 +8,7 @@ public class PostgreSqlFixture : IAsyncLifetime
 
     public string GetConnectionString() => Container.GetConnectionString();
 
-    public async ValueTask InitializeAsync()
+    public async Task InitializeAsync()
     {
         Container = new PostgreSqlBuilder()
             .WithDatabase("eventtracker_test")
@@ -19,7 +19,7 @@ public class PostgreSqlFixture : IAsyncLifetime
         await Container.StartAsync();
     }
 
-    public async ValueTask DisposeAsync()
+    public async Task DisposeAsync()
     {
         await Container.StopAsync();
         await Container.DisposeAsync();

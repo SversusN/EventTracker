@@ -1,9 +1,9 @@
-using EventTrackerApi.Infrastructure;
-using EventTrackerApi.Models.Dto;
-using EventTrackerApi.Services;
+using EventTrackerApi.Presentation.Infrastructure;
+using EventTrackerApi.Application.DTOs;
+using EventTrackerApi.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace EventTrackerApi.Controllers;
+namespace EventTrackerApi.Presentation.Controllers;
 
 /// <summary>
 /// Контроллер для управления бронированиями

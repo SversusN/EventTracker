@@ -16,6 +16,19 @@ REST API сервис для управления мероприятиями и 
 - .NET 10 SDK
 - PostgreSQL (для хранения данных)
 
+## Структура проекта
+
+Проект организован по принципам **чистой архитектуры** и разделён на 4 отдельных слоя (сборки):
+
+| Проект | Назначение | Зависимости |
+|--------|-----------|-------------|
+| `EventTrackerApi.Domain` | Доменные сущности (`Event`, `Booking`), перечисления (`BookingStatus`), доменные исключения (`NoAvailableSeatsException`) | — |
+| `EventTrackerApi.Application` | Use cases, сервисы (`EventService`, `BookingService`), интерфейсы портов (`IEventRepository`, `IBookingRepository`), DTO, мапперы | `Domain` |
+| `EventTrackerApi.Infrastructure` | Реализации портов (`EventRepository`, `BookingRepository`), `DbContext`, миграции EF Core | `Domain`, `Application` |
+| `EventTrackerApi.Presentation` | Контроллеры, middleware, глобальная обработка исключений, composition root (`Program.cs`) | `Domain`, `Application`, `Infrastructure` |
+
+**Ключевое правило:** `Application` не зависит от `Infrastructure` напрямую — только через интерфейсы портов. Инфраструктурные реализации подключаются в `Program.cs` через DI.
+
 ## Запуск проекта
 
 ### Настройка базы данных
@@ -39,32 +52,32 @@ REST API сервис для управления мероприятиями и 
 
 ### Миграции
 
-Создание новой миграции:
+Создание новой миграции (DbContext находится в `Infrastructure`, запуск из `Presentation`):
 ```bash
-dotnet ef migrations add <MigrationName>
+dotnet ef migrations add <MigrationName> --project EventTrackerApi.Infrastructure --startup-project EventTrackerApi.Presentation
 ```
 
 Применение миграций вручную (опционально — приложение делает это автоматически при старте):
 ```bash
-dotnet ef database update
+dotnet ef database update --project EventTrackerApi.Infrastructure --startup-project EventTrackerApi.Presentation
 ```
 
 ### Запуск
 
 ```bash
-dotnet build
-dotnet run
+dotnet build EventTrackerApi.slnx
+dotnet run --project EventTrackerApi.Presentation.csproj
 ```
 
-После запуска API будет доступен по адресу: `https://localhost:5001`
+После запуска API будет доступен по адресу: `http://localhost:5001`
 
-Swagger UI: `https://localhost:5001/swagger`
+Swagger UI: `http://localhost:5001/swagger`
 
 ## Запуск тестов
 
 ```bash
 # Все тесты (юнит + интеграционные)
-dotnet test
+dotnet test EventTrackerApi.slnx
 
 # Только юнит-тесты
 dotnet test EventTrackerApi.Tests

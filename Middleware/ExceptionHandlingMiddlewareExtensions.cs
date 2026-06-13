@@ -1,4 +1,4 @@
-namespace EventTrackerApi.Middleware;
+namespace EventTrackerApi.Presentation.Middleware;
 
 /// <summary>
 /// Расширения для регистрации mw обработки исключений

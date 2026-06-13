@@ -1,6 +1,6 @@
-using EventTrackerApi.DataAccess;
-using EventTrackerApi.DataAccess.Repositories;
-using EventTrackerApi.Models;
+using EventTrackerApi.Domain.Models;
+using EventTrackerApi.Infrastructure.DataAccess;
+using EventTrackerApi.Infrastructure.DataAccess.Repositories;
 using EventTrackerApi.IntegrationTests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 
@@ -242,7 +242,7 @@ public class RepositoryIntegrationTests(PostgreSqlFixture fixture) : IClassFixtu
 
         // Act
         await using var connection = context.Database.GetDbConnection();
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await connection.OpenAsync();
 
         await using var eventsCmd = connection.CreateCommand();
         eventsCmd.CommandText = "SELECT 1 FROM information_schema.tables WHERE table_name = 'events'";
