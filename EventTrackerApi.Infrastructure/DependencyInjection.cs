@@ -1,6 +1,7 @@
 using EventTrackerApi.Application.Ports;
 using EventTrackerApi.Infrastructure.DataAccess;
 using EventTrackerApi.Infrastructure.DataAccess.Repositories;
+using EventTrackerApi.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,10 @@ public static class DependencyInjection
 
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<ITokenService, TokenService>();
 
         return services;
     }

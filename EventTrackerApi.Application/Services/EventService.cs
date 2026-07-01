@@ -36,6 +36,8 @@ public class EventService(IEventRepository eventRepository, ILogger<EventService
 
     public async Task<Event> CreateEventAsync(string title, string? description, DateTime startAt, DateTime endAt, int totalSeats)
     {
+        startAt = ToUtc(startAt);
+        endAt = ToUtc(endAt);
         ValidateEventData(title, startAt, endAt, totalSeats);
 
         var ev = EventMapper.FromCreateDto(title, description, startAt, endAt, totalSeats);
@@ -50,6 +52,8 @@ public class EventService(IEventRepository eventRepository, ILogger<EventService
     public async Task<Event?> UpdateEventAsync(Guid id, string title, string? description, DateTime startAt, DateTime endAt)
     {
         _logger.LogInformation("Updating event with id: {Id}", id);
+        startAt = ToUtc(startAt);
+        endAt = ToUtc(endAt);
         var existingEvent = await _eventRepository.GetByIdAsync(id);
         if (existingEvent is null)
         {
@@ -66,6 +70,16 @@ public class EventService(IEventRepository eventRepository, ILogger<EventService
 
         _logger.LogInformation("Updated event with id: {Id}", id);
         return updatedEvent;
+    }
+
+    private static DateTime ToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 
     private static void ValidateEventData(string title, DateTime startAt, DateTime endAt, int totalSeats)

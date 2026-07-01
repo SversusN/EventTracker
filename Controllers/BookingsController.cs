@@ -1,6 +1,8 @@
 using EventTrackerApi.Presentation.Infrastructure;
+using EventTrackerApi.Presentation.Infrastructure.Controllers;
 using EventTrackerApi.Application.DTOs;
 using EventTrackerApi.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventTrackerApi.Presentation.Controllers;
@@ -12,15 +14,14 @@ namespace EventTrackerApi.Presentation.Controllers;
 [Route("bookings")]
 public class BookingsController(IBookingService bookingService) : ControllerBase
 {
-
     /// <summary>
-    /// Получить бронирование по идентификатору
+    /// Получить бронирование по идентификатору (требуется аутентификация)
     /// </summary>
-    /// <param name="id">Идентификатор брони (GUID)</param>
-    /// <returns>Бронирование с указанным идентификатором</returns>
     [HttpGet("{id:guid}")]
+    [Authorize]
     [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetBookingById(Guid id)
     {
         var booking = await bookingService.GetBookingByIdAsync(id);
@@ -32,6 +33,7 @@ public class BookingsController(IBookingService bookingService) : ControllerBase
         var response = new BookingResponseDto(
             booking.Id,
             booking.EventId,
+            booking.UserId,
             booking.Status,
             booking.CreatedAt,
             booking.ProcessedAt
@@ -39,4 +41,21 @@ public class BookingsController(IBookingService bookingService) : ControllerBase
 
         return Ok(response);
     }
+
+    /// <summary>
+    /// Отменить бронирование (требуется аутентификация)
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CancelBooking(Guid id)
+    {
+        var userId = this.GetCurrentUserId();
+        await bookingService.CancelBookingAsync(id, userId);
+        return NoContent();
+    }
+
 }
