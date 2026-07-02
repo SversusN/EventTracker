@@ -1,3 +1,206 @@
+# EventTracker — микросервисная система управления мероприятиями
+
+Система управления мероприятиями и бронированиями, разделённая на три независимых микросервиса с асинхронным обменом сообщениями через Apache Kafka.
+
+## Состав системы
+
+| Сервис | Ответственность | База данных | Порт |
+|--------|-----------------|-------------|------|
+| **UsersService** | Регистрация, вход, выдача JWT | `eventtracker_users` | 5001 |
+| **EventsService** | CRUD событий, учёт доступных мест | `eventtracker_events` | 5002 |
+| **BookingsService** | Создание и отмена броней | `eventtracker_bookings` | 5003 |
+| **Kafka** | Брокер сообщений | — | 9092 |
+| **Zookeeper** | Координация Kafka | — | 2181 |
+
+Каждый сервис построен по принципам чистой архитектуры и состоит из слоёв:
+
+- `Domain` — доменные сущности, исключения, правила
+- `Application` — use cases, порты, DTO, сервисы
+- `Infrastructure` — EF Core, репозитории, Kafka producer/consumer, миграции
+- `Presentation` — контроллеры, middleware, Swagger, DI
+
+Общий контракт сообщений Kafka вынесен в разделяемый проект `EventTracker.Contracts`.
+
+## Архитектура взаимодействия
+
+```
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│  UsersService   │      │  EventsService  │      │ BookingsService │
+│  (Auth + JWT)   │      │  (Events CRUD)  │      │  (Bookings)     │
+│     :5001       │      │     :5002       │      │     :5003       │
+└────────┬────────┘      └────────┬────────┘      └────────┬────────┘
+         │                        │                        │
+         │ JWT token              │                        │
+         ├────────────────────────┤                        │
+         │                        │                        │
+         │                        │  BookingConfirmed      │
+         │                        │  (Kafka topic)         │
+         │                        │◄───────────────────────┤
+         │                        │                        │
+```
+
+### Поток BookingConfirmed
+
+1. Пользователь создаёт бронь в `BookingsService` (`POST /bookings`).
+2. Фоновый обработчик `BookingProcessingService` находит брони в статусе `Pending` и подтверждает их.
+3. `BookingsService` сохраняет бронь со статусом `Confirmed`, а затем публикует в Kafka событие `BookingConfirmed` с ключом `EventId`.
+4. `EventsService` подписан на топик `booking-confirmed`, получает событие и уменьшает количество доступных мест у соответствующего события.
+
+Сервисы не вызывают друг друга по HTTP напрямую — весь обмен идёт через Kafka.
+
+## Требования
+
+- .NET 10 SDK
+- Docker + Docker Compose
+
+## Запуск
+
+```bash
+docker compose up -d
+```
+
+После запуска будут доступны:
+
+- UsersService Swagger: `http://localhost:5001/swagger`
+- EventsService Swagger: `http://localhost:5002/swagger`
+- BookingsService Swagger: `http://localhost:5003/swagger`
+- Kafka: `localhost:9092`
+
+При первом старте `EventsService` создаёт Kafka-топик `booking-confirmed`, если он ещё не существует.
+
+## Seed-данные
+
+При старте `UsersService` автоматически создаётся администратор:
+
+| Login | Password | Role |
+|-------|----------|------|
+| `admin` | `Pass@word1` | `Admin` |
+
+## API Endpoints
+
+### UsersService (`:5001`)
+
+```http
+POST /auth/register
+Content-Type: application/json
+
+{
+  "login": "user1",
+  "password": "Str0ngP@ss!",
+  "role": "User"
+}
+```
+
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "Pass@word1"
+}
+```
+
+### EventsService (`:5002`)
+
+```http
+GET /events
+```
+
+```http
+POST /events
+Content-Type: application/json
+Authorization: Bearer {admin-token}
+
+{
+  "title": "Конференция",
+  "description": "IT конференция",
+  "startAt": "2026-04-15T10:00:00",
+  "endAt": "2026-04-15T18:00:00",
+  "totalSeats": 3
+}
+```
+
+### BookingsService (`:5003`)
+
+```http
+POST /bookings
+Content-Type: application/json
+Authorization: Bearer {user-token}
+
+{
+  "eventId": "{event-id}"
+}
+```
+
+```http
+DELETE /bookings/{booking-id}
+Authorization: Bearer {user-token}
+```
+
+## Пример сценария
+
+```bash
+# 1. Логин администратора
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:5001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"admin","password":"Pass@word1"}' | jq -r '.token')
+
+# 2. Создание события на 3 места
+curl -X POST http://localhost:5002/events \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"title":"Конференция","description":"IT конференция","startAt":"2026-04-15T10:00:00","endAt":"2026-04-15T18:00:00","totalSeats":3}'
+
+# 3. Регистрация и логин пользователя
+curl -X POST http://localhost:5001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"login":"user1","password":"UserPass1!"}'
+
+USER_TOKEN=$(curl -s -X POST http://localhost:5001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"user1","password":"UserPass1!"}' | jq -r '.token')
+
+# 4. Создание брони
+BOOKING=$(curl -s -X POST http://localhost:5003/bookings \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -d '{"eventId":"{event-id}"}')
+
+# 5. Через несколько секунд проверяем, что места уменьшились
+curl http://localhost:5002/events/{event-id}
+```
+
+## Конфигурация JWT
+
+Все три сервиса используют общие значения:
+
+```json
+{
+  "Jwt": {
+    "Secret": "YourSuperSecretKeyForEventTrackerMicroservicesDevelopmentOnly!",
+    "Issuer": "EventTracker",
+    "Audience": "EventTracker",
+    "ExpiresHours": "24"
+  }
+}
+```
+
+В Docker Compose значения переопределяются через переменные окружения.
+
+docker-compose.yml
+```
+
+## Примечания
+
+- `BookingsService` не уменьшает места у событий напрямую — это делает `EventsService` через Kafka.
+- `EventsService` гарантирует создание топика `booking-confirmed` при старте.
+- Ключ сообщения Kafka — `EventId`, что обеспечивает порядок обработки броней по одному событию.
+
+```
+
+### LEGACY
+
 # EventTracker API
 
 REST API сервис для управления мероприятиями и бронированиями.
