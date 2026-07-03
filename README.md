@@ -862,7 +862,7 @@ dotnet test --verbosity normal
 - Обновление события (успех и не найдено)
 - Удаление события (NoContent и NotFound)
 - Создание брони (Accepted, NotFound, Conflict)
-- Изоляция тестов через Mock<IEventService>
+- Изоляция тестов через Mock (IEventService)
 
 ##### Тесты сервиса бронирований (BookingServiceTests)
 - Создание брони уменьшает `AvailableSeats` на 1
