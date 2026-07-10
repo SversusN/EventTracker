@@ -53,19 +53,30 @@ public class EventsController(IEventService eventService) : ControllerBase
     }
 
     /// <summary>
-    /// Получить событие по идентификатору
+    /// Получить событие по идентификатору (с кешированием)
     /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(EventResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetEventById(Guid id)
+    public async Task<IActionResult> GetEventById(Guid id, CancellationToken cancellationToken)
     {
-        var ev = await _eventService.GetEventByIdAsync(id);
+        var ev = await _eventService.GetEventByIdAsync(id, cancellationToken);
         if (ev is null)
         {
             return NotFound(ProblemDetailsHelper.NotFound("Событие", id));
         }
-        return Ok(EventMapper.ToResponseDto(ev));
+        return Ok(ev);
+    }
+
+    /// <summary>
+    /// Получить топ-10 самых популярных событий (с кешированием)
+    /// </summary>
+    [HttpGet("top")]
+    [ProducesResponseType(typeof(IReadOnlyList<EventResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTopEvents(CancellationToken cancellationToken)
+    {
+        var events = await _eventService.GetTopEventsAsync(10, cancellationToken);
+        return Ok(events);
     }
 
     /// <summary>
