@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EventTracker.Contracts/EventTracker.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/EventTracker.BookingsService/">
+    <Project Path="src/EventTracker.BookingsService/EventTracker.BookingsService.Application/EventTracker.BookingsService.Application.csproj" />
+    <Project Path="src/EventTracker.BookingsService/EventTracker.BookingsService.Domain/EventTracker.BookingsService.Domain.csproj" />
+    <Project Path="src/EventTracker.BookingsService/EventTracker.BookingsService.Infrastructure/EventTracker.BookingsService.Infrastructure.csproj" />
+    <Project Path="src/EventTracker.BookingsService/EventTracker.BookingsService.Presentation/EventTracker.BookingsService.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/EventTracker.EventsService/">
+    <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Application/EventTracker.EventsService.Application.csproj" />
+    <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Domain/EventTracker.EventsService.Domain.csproj" />
+    <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Infrastructure/EventTracker.EventsService.Infrastructure.csproj" />
+    <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Presentation/EventTracker.EventsService.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/EventTracker.UsersService/">
+    <Project Path="src/EventTracker.UsersService/EventTracker.UsersService.Application/EventTracker.UsersService.Application.csproj" />
+    <Project Path="src/EventTracker.UsersService/EventTracker.UsersService.Domain/EventTracker.UsersService.Domain.csproj" />
+    <Project Path="src/EventTracker.UsersService/EventTracker.UsersService.Infrastructure/EventTracker.UsersService.Infrastructure.csproj" />
+    <Project Path="src/EventTracker.UsersService/EventTracker.UsersService.Presentation/EventTracker.UsersService.Presentation.csproj" />
+  </Folder>
+</Solution>

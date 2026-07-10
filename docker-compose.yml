@@ -1,0 +1,168 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.9.0
+    container_name: eventtracker-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - eventtracker-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.9.0
+    container_name: eventtracker-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    networks:
+      - eventtracker-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-users:
+    image: postgres:17
+    container_name: eventtracker-db-users
+    environment:
+      POSTGRES_DB: eventtracker_users
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-users-data:/var/lib/postgresql/data
+    networks:
+      - eventtracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-events:
+    image: postgres:17
+    container_name: eventtracker-db-events
+    environment:
+      POSTGRES_DB: eventtracker_events
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - db-events-data:/var/lib/postgresql/data
+    networks:
+      - eventtracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-bookings:
+    image: postgres:17
+    container_name: eventtracker-db-bookings
+    environment:
+      POSTGRES_DB: eventtracker_bookings
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - db-bookings-data:/var/lib/postgresql/data
+    networks:
+      - eventtracker-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  users-service:
+    build:
+      context: ./src
+      dockerfile: EventTracker.UsersService/EventTracker.UsersService.Presentation/Dockerfile
+    container_name: eventtracker-users-service
+    depends_on:
+      db-users:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+    environment:
+      ASPNETCORE_URLS: "http://+:5001"
+      ConnectionStrings__DefaultConnection: "Host=db-users;Port=5432;Database=eventtracker_users;Username=postgres;Password=postgres"
+      Jwt__Secret: "YourSuperSecretKeyForEventTrackerMicroservicesDevelopmentOnly!"
+      Jwt__Issuer: "EventTracker"
+      Jwt__Audience: "EventTracker"
+      Jwt__ExpiresHours: "24"
+    networks:
+      - eventtracker-network
+
+  events-service:
+    build:
+      context: ./src
+      dockerfile: EventTracker.EventsService/EventTracker.EventsService.Presentation/Dockerfile
+    container_name: eventtracker-events-service
+    depends_on:
+      db-events:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5002:5002"
+    environment:
+      ASPNETCORE_URLS: "http://+:5002"
+      ConnectionStrings__DefaultConnection: "Host=db-events;Port=5432;Database=eventtracker_events;Username=postgres;Password=postgres"
+      Jwt__Secret: "YourSuperSecretKeyForEventTrackerMicroservicesDevelopmentOnly!"
+      Jwt__Issuer: "EventTracker"
+      Jwt__Audience: "EventTracker"
+      Jwt__ExpiresHours: "24"
+      Kafka__BootstrapServers: "kafka:29092"
+      Kafka__ConsumerGroup: "events-service"
+    networks:
+      - eventtracker-network
+
+  bookings-service:
+    build:
+      context: ./src
+      dockerfile: EventTracker.BookingsService/EventTracker.BookingsService.Presentation/Dockerfile
+    container_name: eventtracker-bookings-service
+    depends_on:
+      db-bookings:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "5003:5003"
+    environment:
+      ASPNETCORE_URLS: "http://+:5003"
+      ConnectionStrings__DefaultConnection: "Host=db-bookings;Port=5432;Database=eventtracker_bookings;Username=postgres;Password=postgres"
+      Jwt__Secret: "YourSuperSecretKeyForEventTrackerMicroservicesDevelopmentOnly!"
+      Jwt__Issuer: "EventTracker"
+      Jwt__Audience: "EventTracker"
+      Jwt__ExpiresHours: "24"
+      Kafka__BootstrapServers: "kafka:29092"
+      Booking__MaxActiveBookingsPerUser: "10"
+    networks:
+      - eventtracker-network
+
+volumes:
+  db-users-data:
+  db-events-data:
+  db-bookings-data:
+
+networks:
+  eventtracker-network:
+    driver: bridge
