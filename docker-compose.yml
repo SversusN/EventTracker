@@ -90,6 +90,21 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventtracker-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - eventtracker-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   users-service:
     build:
       context: ./src
@@ -120,11 +135,16 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "5002:5002"
     environment:
       ASPNETCORE_URLS: "http://+:5002"
       ConnectionStrings__DefaultConnection: "Host=db-events;Port=5432;Database=eventtracker_events;Username=postgres;Password=postgres"
+      Redis__ConnectionString: "redis:6379"
+      Cache__EventTtlSeconds: "300"
+      Cache__TopEventsTtlSeconds: "60"
       Jwt__Secret: "YourSuperSecretKeyForEventTrackerMicroservicesDevelopmentOnly!"
       Jwt__Issuer: "EventTracker"
       Jwt__Audience: "EventTracker"
@@ -162,6 +182,7 @@ volumes:
   db-users-data:
   db-events-data:
   db-bookings-data:
+  redis-data:
 
 networks:
   eventtracker-network:
