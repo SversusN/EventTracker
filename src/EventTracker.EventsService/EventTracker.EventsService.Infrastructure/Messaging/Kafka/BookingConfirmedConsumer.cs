@@ -114,6 +114,7 @@ public class BookingConfirmedConsumer : BackgroundService
 
         using var scope = _serviceProvider.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+        var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
 
         var ev = await repository.GetByIdAsync(bookingEvent.EventId);
         if (ev is null)
@@ -133,6 +134,8 @@ public class BookingConfirmedConsumer : BackgroundService
         }
 
         await repository.SaveChangesAsync();
+
+        await cacheService.RemoveAsync(CacheKeys.Event(bookingEvent.EventId), cancellationToken);
 
         _logger.LogInformation(
             "Decreased available seats for event {EventId} by {Seats}. Remaining: {Available}",
