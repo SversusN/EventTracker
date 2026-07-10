@@ -13,6 +13,7 @@
     <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Domain/EventTracker.EventsService.Domain.csproj" />
     <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Infrastructure/EventTracker.EventsService.Infrastructure.csproj" />
     <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Presentation/EventTracker.EventsService.Presentation.csproj" />
+    <Project Path="src/EventTracker.EventsService/EventTracker.EventsService.Tests/EventTracker.EventsService.Tests.csproj" />
   </Folder>
   <Folder Name="/src/EventTracker.UsersService/">
     <Project Path="src/EventTracker.UsersService/EventTracker.UsersService.Application/EventTracker.UsersService.Application.csproj" />
