@@ -12,6 +12,9 @@
 | **Kafka** | Брокер сообщений | — | 9092 |
 | **Zookeeper** | Координация Kafka | — | 2181 |
 | **Redis** | Распределённый кеш | — | 6379 |
+| **Prometheus** | Сбор метрик | — | 9090 |
+| **Grafana** | Визуализация метрик | — | 3000 |
+| **Jaeger** | Распределённая трассировка | — | 16686 |
 
 Каждый сервис построен по принципам чистой архитектуры и состоит из слоёв:
 
@@ -67,6 +70,9 @@ docker compose up -d
 - BookingsService: `http://localhost:5003`
 - Kafka: `localhost:9092`
 - Redis: `localhost:6379`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin / admin)
+- Jaeger UI: `http://localhost:16686`
 
 > Swagger доступен только в Development-окружении. При запуске через Docker Compose установите `ASPNETCORE_ENVIRONMENT=Development` или откройте swagger вручную, задав переменную окружения.
 
@@ -231,6 +237,79 @@ curl http://localhost:5002/events/top
 - `Redis__ConnectionString`
 - `Cache__EventTtlSeconds`
 - `Cache__TopEventsTtlSeconds`
+
+## Наблюдаемость
+
+Все три микросервиса инструментированы с помощью **OpenTelemetry** и пишут структурированные логи в формате **Serilog Compact JSON**.
+
+### Метрики (Prometheus)
+
+Каждый сервис экспортирует метрики по пути `/metrics` в формате Prometheus:
+
+| Сервис | URL |
+|--------|-----|
+| UsersService | `http://localhost:5001/metrics` |
+| EventsService | `http://localhost:5002/metrics` |
+| BookingsService | `http://localhost:5003/metrics` |
+
+Собираемые метрики:
+
+- `http_server_request_duration_seconds_*` — длительность HTTP-запросов
+- `http_server_active_requests` — активные запросы
+- `kestrel_*` — метрики Kestrel
+- `dotnet_gc_collections_total` — сборки мусора
+- `process_runtime_dotnet_memory_usage_bytes` — использование памяти
+
+**Prometheus** доступен по адресу `http://localhost:9090`.
+
+### Трассировка (Jaeger)
+
+Трассировки отправляются по OTLP/gRPC в **Jaeger** (`http://jaeger:4317` внутри Docker Compose). В UI `http://localhost:16686` можно искать трейсы по сервисам:
+
+- `users-service`
+- `events-service`
+- `bookings-service`
+
+В трейсы попадают запросы ASP.NET Core, HTTP-клиенты и операции Entity Framework Core.
+
+### Дашборды (Grafana)
+
+В Grafana предустановлен дашборд **EventTracker Services** (`http://localhost:3000/d/eventtracker-services`). Для входа используйте логин/пароль `admin` / `admin`.
+
+Дашборд содержит панели:
+
+- HTTP Request Rate
+- HTTP Error Rate (5xx)
+- HTTP Request Latency (p50/p95/p99)
+- Active HTTP Requests
+- .NET Memory Usage
+- .NET GC Collections
+
+### Логирование (Serilog)
+
+Все сервисы используют `Serilog.AspNetCore` с выводом в консоль в формате `CompactJsonFormatter`. Логи можно собирать через `docker compose logs` или перенаправлять в любую систему централизованного логирования.
+
+Пример структурированной записи:
+
+```json
+{"@t":"2026-07-30T17:32:40.3314360Z","@mt":"Now listening on: {address}","address":"http://[::]:5001","SourceContext":"Microsoft.Hosting.Lifetime"}
+```
+
+### Конфигурация наблюдаемости
+
+Конечная точка OTLP задаётся в `appsettings.json`:
+
+```json
+{
+  "Otlp": {
+    "Endpoint": "http://localhost:4317"
+  }
+}
+```
+
+В Docker Compose значение переопределяется через переменную окружения:
+
+- `Otlp__Endpoint=http://jaeger:4317`
 
 ## Конфигурация JWT
 
