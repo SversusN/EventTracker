@@ -1,6 +1,6 @@
-using EventTracker.EventsService.Domain.Models;
 using EventTracker.EventsService.Application.DTOs;
 using EventTracker.EventsService.Application.Ports;
+using EventTracker.EventsService.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventTracker.EventsService.Infrastructure.DataAccess.Repositories;
@@ -47,6 +47,16 @@ public class EventRepository(AppDbContext context) : IEventRepository
     public async Task<Event?> GetByIdAsync(Guid id)
     {
         return await _context.Events.FirstOrDefaultAsync(e => e.Id == id);
+    }
+
+    public async Task<IReadOnlyList<Event>> GetTopEventsAsync(int count, CancellationToken cancellationToken = default)
+    {
+        return await _context.Events
+            .Where(e => e.TotalSeats > 0)
+            .OrderByDescending(e => (double)(e.TotalSeats - e.AvailableSeats) / e.TotalSeats)
+            .ThenBy(e => e.StartAt)
+            .Take(count)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(Event ev)
